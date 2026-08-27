@@ -1,0 +1,118 @@
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+import os, uuid
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
+
+from models.database import get_db
+from models import crud
+from utils.auth import get_current_agent, verify_password, hash_password
+
+router = APIRouter(prefix="/profile", tags=["Profile"])
+
+AVATAR_DIR = "static/avatars"
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+MAX_SIZE_BYTES = 2 * 1024 * 1024  # 2MB, matches the UI copy ("Maximum 2MB")
+
+
+class ProfileUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    department: Optional[str] = None
+    time_zone: Optional[str] = None
+    language: Optional[str] = None
+
+
+def _serialize(agent):
+    return {
+        "id": agent.id,
+        "username": agent.username,
+        "name": agent.name,
+        "email": agent.email,
+        "phone": agent.phone,
+        "department": agent.department,
+        "time_zone": agent.time_zone,
+        "language": agent.language,
+        "created_at": agent.created_at,
+        "last_active": agent.last_active,
+        "avatar_url": agent.avatar_url,
+    }
+
+
+@router.get("")
+def get_profile(current_agent=Depends(get_current_agent)):
+    return _serialize(current_agent)
+
+
+@router.patch("")
+def update_profile(
+    payload: ProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    current_agent=Depends(get_current_agent),
+):
+    updated = crud.update_agent_profile(db, current_agent, **payload.dict())
+
+    if updated.notify_profile_updated:
+        crud.create_notification(
+            db,
+            agent_id=current_agent.id,
+            category="profile",
+            title="Profile Updated",
+            message="Your profile has been updated successfully.",
+        )
+
+    return _serialize(updated)
+
+
+@router.post("/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_agent=Depends(get_current_agent),
+):
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    contents = await file.read()
+    if len(contents) > MAX_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (max 2MB)")
+
+    filename = f"{current_agent.id}_{uuid.uuid4().hex}{ext}"
+    filepath = os.path.join(AVATAR_DIR, filename)
+
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    avatar_url = f"/static/avatars/{filename}"
+    updated = crud.update_agent_avatar(db, current_agent, avatar_url)
+    return _serialize(updated)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.patch("/password")
+def change_password(
+    payload: ChangePasswordRequest,
+    agent=Depends(get_current_agent),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(payload.current_password, agent.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    new_hash = hash_password(payload.new_password)
+    crud.change_agent_password(db, agent, new_hash)
+
+    if agent.notify_password_changed:
+        crud.create_notification(
+            db,
+            agent_id=agent.id,
+            category="profile",
+            title="Password Changed",
+            message="Your password has been changed successfully.",
+        )
+
+    return {"detail": "Password updated successfully"}

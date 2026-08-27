@@ -1,0 +1,52 @@
+@"
+# Backend environment variables
+backend/.env
+backend/.env.*
+# Backend virtual environment
+backend/venv/
+backend/.venv/
+# Backend dependencies
+backend/node_modules/
+# Python cache
+backend/__pycache__/
+backend/**/*.pyc
+# Local databases and generated vector database
+*.db
+*.db.bak
+*.sqlite
+*.sqlite3
+backend/chroma_db/
+# Backend runtime/generated data
+backend/uploaded_docs/
+# User-uploaded files
+backend/static/avatars/*
+!backend/static/avatars/.gitkeep
+backend/static/support_screenshots/*
+!backend/static/support_screenshots/.gitkeep
+# Frontend dependencies
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+# Frontend environment variables
+frontend/.env
+frontend/.env.*
+# Editor / OS junk
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+"@ | Set-Content -Encoding UTF8 .gitignore

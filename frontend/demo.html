@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Coach — Session Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14171F;
+    --ink-soft:#1E222C;
+    --paper:#F6F5F1;
+    --paper-raised:#FFFFFF;
+    --paper-sunken:#F1EFE7;
+    --line:#E4E1D8;
+    --text:#1B1D22;
+    --text-muted:#6B7280;
+    --text-on-ink:#EDEBE3;
+    --text-on-ink-muted:#8B8F9C;
+    --teal:#2F6F62;
+    --teal-dark:#245349;
+    --teal-tint:#E7F0EC;
+    --teal-border:#CFE1DA;
+    --amber:#C98A3E;
+    --amber-dark:#A66F2E;
+    --amber-tint:#F7EADB;
+    --amber-border:#EAD6B4;
+    --red:#B4442E;
+    --red-dark:#963823;
+    --red-tint:#FBEAE6;
+    --red-border:#EFC7BC;
+    --radius:10px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  h1,h2,h3,.display{ font-family:'Space Grotesk', sans-serif; }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background:var(--ink);
+    color:var(--text-on-ink);
+    padding:20px 32px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:34px; height:34px; border-radius:8px;
+    background:linear-gradient(135deg, var(--teal), var(--teal-dark));
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk'; font-weight:700; font-size:15px; color:white;
+  }
+  .brand-text h1{ font-size:17px; font-weight:600; letter-spacing:.2px; }
+  .brand-text p{ font-size:12px; color:var(--text-on-ink-muted); margin-top:1px; }
+  .back-btn{
+    background:transparent; border:1px solid #333849; color:var(--text-on-ink);
+    padding:8px 14px; border-radius:8px; font-size:13px; cursor:pointer;
+    font-family:'Inter'; display:none; align-items:center; gap:6px;
+  }
+  .back-btn:hover{ border-color:#4b5266; }
+
+  .wrap{ max-width:1180px; margin:0 auto; padding:44px 32px 80px; }
+
+  /* ---------- Dashboard ---------- */
+  #dashboard-view .intro{ margin-bottom:36px; }
+  #dashboard-view .intro h2{ font-size:26px; font-weight:600; margin-bottom:8px; }
+  #dashboard-view .intro p{ color:var(--text-muted); font-size:14.5px; max-width:560px; line-height:1.5; }
+
+  .mode-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:20px;
+  }
+  .mode-card{
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:26px 24px;
+    display:flex; flex-direction:column;
+    min-height:220px;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .mode-card.active{ cursor:pointer; }
+  .mode-card.active:hover{ transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(20,23,31,.18); }
+  .mode-card.disabled{ opacity:.55; }
+
+  .mode-top{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:18px;}
+  .mode-icon{
+    width:38px; height:38px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:17px;
+  }
+  .mode-card.active .mode-icon{ background:var(--teal-tint); color:var(--teal-dark); }
+  .mode-card.disabled .mode-icon{ background:#EFEEE9; color:#9A9A93; }
+
+  .live-tag{
+    display:flex; align-items:center; gap:6px;
+    font-size:11px; font-weight:600; letter-spacing:.4px; text-transform:uppercase;
+    color:var(--teal-dark); background:var(--teal-tint);
+    padding:4px 9px; border-radius:20px;
+  }
+  .live-dot{
+    width:6px; height:6px; border-radius:50%; background:var(--teal-dark);
+    animation:pulse 1.6s infinite ease-in-out;
+  }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  .soon-tag{
+    font-size:11px; font-weight:600; letter-spacing:.4px; text-transform:uppercase;
+    color:#8A8A82; background:#EFEEE9; padding:4px 9px; border-radius:20px;
+  }
+
+  .mode-card h3{ font-size:17px; font-weight:600; margin-bottom:8px; }
+  .mode-card p{ font-size:13.5px; color:var(--text-muted); line-height:1.5; flex:1; }
+  .mode-cta{
+    margin-top:16px; font-size:13px; font-weight:600; color:var(--teal-dark);
+    display:flex; align-items:center; gap:5px;
+  }
+  .mode-card.disabled .mode-cta{ color:#9A9A93; }
+
+  .note-box{
+    margin-top:32px; padding:16px 18px; border-radius:var(--radius);
+    background:var(--amber-tint); border:1px solid var(--amber-border);
+    font-size:13px; color:#7A5423; line-height:1.55;
+  }
+  .note-box b{ font-weight:600; }
+
+  /* ---------- Simulator view ---------- */
+  #simulator-view{ display:none; }
+  .sim-header{ margin-bottom:28px; }
+  .sim-header .eyebrow{
+    font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px;
+    color:var(--teal-dark); margin-bottom:6px;
+  }
+  .sim-header h2{ font-size:24px; font-weight:600; }
+
+  .panel{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px 24px; margin-bottom:20px;
+  }
+  .panel h3{ font-size:14px; font-weight:600; margin-bottom:16px; display:flex; align-items:center; gap:8px;}
+  .panel h3 .num{
+    width:20px;height:20px; border-radius:5px; background:var(--ink); color:var(--text-on-ink);
+    font-size:11px; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono';
+  }
+
+  label{ display:block; font-size:12.5px; font-weight:500; color:var(--text-muted); margin-bottom:6px; }
+  input[type=text], textarea, select{
+    width:100%; border:1px solid var(--line); border-radius:7px; padding:10px 12px;
+    font-family:'Inter'; font-size:13.5px; background:#FDFCFA; color:var(--text);
+  }
+  input[type=text]:focus, textarea:focus, select:focus{ outline:2px solid var(--teal); outline-offset:1px; }
+  .field{ margin-bottom:14px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+  .btn{
+    border:none; border-radius:7px; padding:10px 18px; font-size:13.5px; font-weight:600;
+    cursor:pointer; font-family:'Inter'; display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn-primary{ background:var(--teal); color:white; }
+  .btn-primary:hover{ background:var(--teal-dark); }
+  .btn-primary:disabled{ background:#B9C4C0; cursor:not-allowed; }
+  .btn-ghost{ background:transparent; border:1px solid var(--line); color:var(--text); }
+  .btn-ghost:hover{ border-color:#c7c3b6; }
+  .btn-sm{ padding:7px 12px; font-size:12.5px; }
+
+  .status-line{ font-size:12.5px; color:var(--text-muted); margin-top:10px; min-height:16px; }
+  .status-line.ok{ color:var(--teal-dark); }
+  .status-line.err{ color:var(--red); }
+
+  .session-id-box{
+    display:flex; align-items:center; gap:10px; background:var(--teal-tint);
+    border:1px solid var(--teal-border); border-radius:8px; padding:10px 14px; margin-bottom:20px;
+    font-size:12.5px; color:var(--teal-dark);
+  }
+  .session-id-box .mono{ font-weight:500; }
+
+  .two-col{ display:grid; grid-template-columns:1.3fr 1fr; gap:20px; align-items:start; }
+
+  /* chat */
+  .chat-log{
+    display:flex; flex-direction:column; gap:12px; max-height:420px; overflow-y:auto;
+    padding:4px 2px; margin-bottom:14px; min-height:120px;
+  }
+  .msg{ max-width:80%; padding:11px 14px; border-radius:10px; font-size:13.5px; line-height:1.5; }
+  .msg.customer{ background:#EFEDE6; align-self:flex-start; border-bottom-left-radius:3px; }
+  .msg.agent{ background:var(--teal); color:white; align-self:flex-end; border-bottom-right-radius:3px; }
+  .msg .who{ font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; opacity:.6; margin-bottom:4px; }
+  .typing{ font-size:12.5px; color:var(--text-muted); font-style:italic; padding-left:4px; }
+
+  .chat-input-row{ display:flex; gap:10px; }
+  .chat-input-row textarea{ resize:none; height:44px; }
+
+  .kb-results{ margin-top:14px; display:flex; flex-direction:column; gap:10px; }
+  .kb-chunk{
+    background:#FBFAF7; border:1px solid var(--line); border-radius:8px; padding:12px 14px;
+    font-size:13px; line-height:1.5; white-space:pre-wrap;
+  }
+  .kb-empty{ font-size:13px; color:var(--text-muted); font-style:italic; }
+
+  .upload-row{ display:flex; align-items:center; gap:10px; }
+  .upload-row input[type=file]{ font-size:12.5px; }
+
+  .hint{ font-size:11.5px; color:var(--text-muted); margin-top:6px; }
+
+  /* ---------- Gauge ---------- */
+  .gauge-row{ display:flex; align-items:center; gap:16px; }
+  .gauge{ position:relative; width:76px; height:76px; flex-shrink:0; }
+  .gauge svg{ width:100%; height:100%; transform:rotate(-90deg); }
+  .gauge circle{ fill:none; stroke-width:8; }
+  .gauge .gauge-track{ stroke:var(--paper-sunken); }
+  .gauge .gauge-value{ stroke-linecap:round; transition:stroke-dashoffset .5s ease; }
+  .gauge-number{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk'; font-weight:700; font-size:20px; color:var(--text);
+  }
+  .gauge-label{ font-size:12px; color:var(--text-muted); margin-top:4px; }
+
+  /* ---------- Severity badges ---------- */
+  .badge{
+    display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px;
+    font-size:11.5px; font-weight:600; letter-spacing:.2px;
+  }
+  .badge-green{ background:var(--teal-tint); color:var(--teal); border:1px solid var(--teal-border); }
+  .badge-amber{ background:var(--amber-tint); color:var(--amber); border:1px solid var(--amber-border); }
+  .badge-red{ background:var(--red-tint); color:var(--red); border:1px solid var(--red-border); }
+  .badge-neutral{ background:var(--paper-sunken); color:var(--text-muted); border:1px solid var(--line); }
+  .trend-badge{ display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:var(--text-muted); }
+
+  /* ---------- Coaching panel ---------- */
+  .coaching-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:16px; }
+  .coach-card{
+    background:var(--paper-sunken); border:1px solid var(--line); border-radius:8px;
+    padding:14px 16px; display:flex; flex-direction:column; gap:10px;
+  }
+  .coach-card .badge{ align-self:flex-start; }
+  .coach-card p{ font-size:13px; line-height:1.5; color:var(--text); }
+  .coach-tip{
+    display:flex; gap:10px; align-items:flex-start; padding:12px 14px;
+    background:var(--teal-tint); border:1px solid var(--teal-border); border-radius:8px;
+    font-size:13px; line-height:1.5; color:var(--text);
+  }
+  .coach-tip .icon{ flex-shrink:0; }
+
+  /* ---------- Escalation panel ---------- */
+  .escalation-body{ display:flex; align-items:flex-start; gap:20px; }
+  .escalation-meta{ flex:1; }
+  .escalation-meta .field-row{ margin-bottom:10px; }
+  .alert-banner{
+    display:flex; gap:12px; align-items:flex-start; margin-top:16px; padding:14px 16px;
+    background:var(--red-tint); border:1px solid var(--red-border); border-radius:8px;
+  }
+  .alert-banner .icon{ font-size:16px; flex-shrink:0; }
+  .alert-banner .title{ font-size:13px; font-weight:600; color:var(--red); margin-bottom:4px; }
+  .alert-banner .body{ font-size:13px; color:var(--text); line-height:1.5; }
+
+  /* ---------- Session meta bar ---------- */
+  .session-meta-bar{
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 20px; margin-bottom:20px;
+  }
+  .meta-items{ display:flex; gap:28px; flex-wrap:wrap; }
+  .meta-item{ display:flex; flex-direction:column; gap:2px; }
+  .meta-item label{ margin-bottom:0; font-size:10.5px; }
+  .meta-item span{ font-size:13.5px; font-weight:600; color:var(--text); }
+  .meta-item.ended span{ color:var(--text-muted); }
+
+  /* ---------- Workspace grid ---------- */
+  .workspace-grid{ display:grid; grid-template-columns:1.8fr 1fr; gap:20px; align-items:stretch; margin-bottom:20px; }
+  .chat-panel{ display:flex; flex-direction:column; }
+  .chat-panel .chat-log{ flex:1; min-height:480px; max-height:none; }
+
+  .signals-sidebar{ display:flex; flex-direction:column; gap:16px; }
+  .signal-card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px 18px;
+  }
+  .signal-card h4{
+    font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:.4px;
+    color:var(--text-muted); margin-bottom:12px;
+  }
+  .gauge-row-sm{ display:flex; align-items:center; gap:14px; margin-bottom:10px; }
+  .gauge-sm{ width:72px; height:72px; }
+  .gauge-number-sm{ font-size:17px; }
+  .signal-line{ font-size:13px; color:var(--text); margin-top:5px; }
+  .signal-line.muted{ color:var(--text-muted); font-size:12px; }
+  .signal-reasoning{ font-size:12px; color:var(--text-muted); line-height:1.5; margin-top:8px; }
+
+  /* ---------- Frustration trend chip ---------- */
+  .trend-chip{
+    display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px;
+    font-size:11px; font-weight:600; margin-top:7px;
+  }
+  .trend-chip.up{ background:var(--red-tint); color:var(--red); }
+  .trend-chip.down{ background:var(--teal-tint); color:var(--teal-dark); }
+  .trend-chip.flat{ background:var(--paper-sunken); color:var(--text-muted); }
+
+  /* ---------- Frustration sparkline ---------- */
+  .sparkline-label{
+    font-size:10.5px; font-weight:600; color:var(--text-muted); text-transform:uppercase;
+    letter-spacing:.4px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line);
+  }
+  .sparkline{ display:flex; align-items:flex-end; gap:3px; height:32px; margin-top:8px; }
+  .sparkline .spark-bar{
+    flex:1; min-width:4px; max-width:14px; border-radius:2px 2px 0 0;
+    background:var(--teal); transition:height .4s ease, background-color .4s ease;
+  }
+  .sparkline .spark-empty{ font-size:11.5px; color:var(--text-muted); font-style:italic; }
+
+  /* ---------- Escalation risk gauge (large) ---------- */
+  .risk-gauge-wrap{ display:flex; align-items:center; gap:20px; }
+  .risk-gauge{ position:relative; width:108px; height:108px; flex-shrink:0; }
+  .risk-gauge svg{ width:100%; height:100%; transform:rotate(-90deg); }
+  .risk-gauge circle{ fill:none; stroke-width:10; }
+  .risk-gauge .risk-track{ stroke:var(--paper-sunken); }
+  .risk-gauge .risk-value{ stroke-linecap:round; transition:stroke-dashoffset .5s ease, stroke .3s ease; }
+  .risk-gauge-number{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .risk-gauge-number .num{ font-family:'Space Grotesk'; font-weight:700; font-size:27px; color:var(--text); line-height:1; }
+  .risk-gauge-number .of100{ font-size:10px; color:var(--text-muted); margin-top:2px; letter-spacing:.2px; }
+  .risk-detail{ display:flex; flex-direction:column; gap:8px; }
+
+  .signal-card.alert-live{
+    border-color:var(--red-border);
+    animation:alertGlow 1.8s infinite ease-in-out;
+  }
+  @keyframes alertGlow{
+    0%,100%{ box-shadow:0 0 0 1px var(--red-border); }
+    50%{ box-shadow:0 0 0 5px var(--red-tint); }
+  }
+
+  .coach-tip-mini{ display:flex; gap:8px; font-size:13px; line-height:1.5; color:var(--text); margin-bottom:10px; }
+  .coach-tip-mini .icon{ flex-shrink:0; }
+  .expand-toggle{
+    background:none; border:none; padding:0; font-size:12.5px; font-weight:600;
+    color:var(--teal-dark); cursor:pointer; font-family:'Inter';
+  }
+  .expand-toggle:hover{ text-decoration:underline; }
+  .coaching-grid-inline{ display:grid; grid-template-columns:1fr; gap:10px; margin-top:12px; }
+
+  .risk-row{ display:flex; align-items:center; gap:10px; margin-bottom:2px; }
+  .alert-inline{
+    display:flex; gap:10px; align-items:flex-start; margin-top:12px; padding:10px 12px;
+    background:var(--red-tint); border:1px solid var(--red-border); border-radius:8px;
+  }
+  .alert-inline .icon{ font-size:14px; flex-shrink:0; }
+  .alert-inline .title{ font-size:12px; font-weight:600; color:var(--red); margin-bottom:3px; }
+  .alert-inline .body{ font-size:12px; color:var(--text); line-height:1.5; }
+
+  @media (max-width: 900px){
+    .workspace-grid{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">AI</div>
+    <div class="brand-text">
+      <h1>AI Coach — Session Console</h1>
+      <p>Customer Support Coaching Assistant</p>
+    </div>
+  </div>
+  <button class="back-btn" id="backBtn" onclick="showDashboard()">← Back to modes</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ DASHBOARD ============ -->
+  <div id="dashboard-view">
+    <div class="intro">
+      <h2>Choose an interaction mode</h2>
+      <p>Pick how you'd like to run this coaching session.</p>
+    </div>
+
+    <div class="mode-grid">
+      <div class="mode-card active" onclick="showSimulator()">
+        <div class="mode-top">
+          <div class="mode-icon">💬</div>
+          <div class="live-tag"><span class="live-dot"></span>Live</div>
+        </div>
+        <h3>Simulator Mode</h3>
+        <p>An AI-driven customer generates realistic messages turn by turn based on a scenario and persona you set — good for practicing without needing a real customer.</p>
+        <div class="mode-cta">Start a session →</div>
+      </div>
+
+      <div class="mode-card disabled">
+        <div class="mode-top">
+          <div class="mode-icon">✍️</div>
+          <div class="soon-tag">Not wired yet</div>
+        </div>
+        <h3>Manual Mode</h3>
+        <p>Paste in real incoming customer messages one at a time and log your own replies — for coaching on an existing conversation.</p>
+        <div class="mode-cta">Coming soon</div>
+      </div>
+
+      <div class="mode-card disabled">
+        <div class="mode-top">
+          <div class="mode-icon">⏮</div>
+          <div class="soon-tag">Not wired yet</div>
+        </div>
+        <h3>Replay Mode</h3>
+        <p>Load a saved transcript and step through it message by message to review how a past interaction was handled.</p>
+        <div class="mode-cta">Coming soon</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ SIMULATOR VIEW ============ -->
+  <div id="simulator-view">
+    <div class="sim-header">
+      <div class="eyebrow">Simulator Mode</div>
+      <h2>Set up your session</h2>
+    </div>
+
+    <!-- Step 1: create session -->
+    <div class="panel" id="setupPanel">
+      <h3><span class="num">1</span>Session details</h3>
+      <div class="field">
+        <label>Scenario</label>
+        <input type="text" id="scenarioInput" placeholder="e.g. Customer upset about a delayed shipment that was supposed to arrive 3 days ago">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Customer tone</label>
+          <select id="toneInput">
+            <option value="frustrated but polite">Frustrated but polite</option>
+            <option value="calm">Calm</option>
+            <option value="angry">Angry</option>
+            <option value="confused">Confused</option>
+            <option value="anxious">Anxious</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Patience level</label>
+          <select id="patienceInput">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Product context <span style="font-weight:400;">(optional)</span></label>
+        <input type="text" id="contextInput" placeholder="e.g. Online retail order support">
+      </div>
+      <button class="btn btn-primary" id="createSessionBtn" onclick="createSession()">Create session</button>
+      <div class="status-line" id="createStatus"></div>
+    </div>
+
+    <!-- Step 2+: working session -->
+    <div id="sessionPanels" style="display:none;">
+      <div class="session-meta-bar">
+        <div class="meta-items">
+          <div class="meta-item"><label>Scenario</label><span id="metaScenario">—</span></div>
+          <div class="meta-item"><label>Tone</label><span id="metaTone">—</span></div>
+          <div class="meta-item"><label>Patience</label><span id="metaPatience">—</span></div>
+          <div class="meta-item" id="metaDurationWrap"><label>Duration</label><span class="mono" id="metaDuration">00:00:00</span></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="endSessionBtn" onclick="endSession()">End session</button>
+      </div>
+
+      <div class="workspace-grid">
+        <!-- Conversation -->
+        <div class="panel chat-panel">
+          <h3>Conversation</h3>
+          <div class="chat-log" id="chatLog"></div>
+          <div class="typing" id="typingIndicator" style="display:none;">Customer is typing…</div>
+          <div class="chat-input-row">
+            <textarea id="agentReplyInput" placeholder="Type your reply as the agent, then send…"></textarea>
+            <button class="btn btn-primary" id="sendReplyBtn" onclick="sendAgentReply()">Send</button>
+          </div>
+          <div class="hint">Sending your reply logs it and prompts the simulated customer for their next message.</div>
+        </div>
+
+        <!-- Live signals -->
+        <div class="signals-sidebar">
+          <div class="signal-card" id="sentimentPanel" style="display:none;">
+            <h4>Sentiment</h4>
+            <div class="gauge-row-sm">
+              <div class="gauge gauge-sm">
+                <svg viewBox="0 0 80 80">
+                  <circle class="gauge-track" cx="40" cy="40" r="32"></circle>
+                  <circle class="gauge-value" id="sentGaugeArc" cx="40" cy="40" r="32"></circle>
+                </svg>
+                <div class="gauge-number gauge-number-sm" id="sentScoreNum">—</div>
+              </div>
+              <div style="flex:1;">
+                <span class="badge badge-neutral" id="sentEmotionBadge"></span>
+                <p class="signal-line" id="sentIntent"></p>
+                <span class="trend-chip flat" id="sentTrendChip"></span>
+              </div>
+            </div>
+            <p class="signal-reasoning" id="sentReasoning"></p>
+            <div class="sparkline-label">Frustration across this session</div>
+            <div class="sparkline" id="frustrationSparkline"></div>
+          </div>
+
+          <div class="signal-card" id="coachingPanel" style="display:none;">
+            <h4>Coaching</h4>
+            <div class="coach-tip-mini">
+              <span class="icon">💡</span>
+              <span id="coachTip"></span>
+            </div>
+            <button class="expand-toggle" id="coachToggleBtn" onclick="toggleCoachSuggestions()">View suggested responses ▾</button>
+            <div class="coaching-grid-inline" id="coachCardsGrid" style="display:none;"></div>
+          </div>
+
+          <div class="signal-card" id="escalationPanel" style="display:none;">
+            <h4>Escalation risk</h4>
+            <div class="risk-gauge-wrap">
+              <div class="risk-gauge">
+                <svg viewBox="0 0 108 108">
+                  <circle class="risk-track" cx="54" cy="54" r="46"></circle>
+                  <circle class="risk-value" id="escGaugeArc" cx="54" cy="54" r="46"></circle>
+                </svg>
+                <div class="risk-gauge-number">
+                  <span class="num" id="escScoreNum">—</span>
+                  <span class="of100">/ 100</span>
+                </div>
+              </div>
+              <div class="risk-detail">
+                <span class="badge badge-neutral" id="escLevelBadge"></span>
+                <span class="signal-line muted mono" id="escScoreText"></span>
+              </div>
+            </div>
+            <div class="alert-inline" id="escAlertBanner" style="display:none;">
+              <span class="icon">⚠️</span>
+              <div>
+                <div class="title">Escalation alert triggered</div>
+                <div class="body" id="escAlertBody"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Knowledge base, full width -->
+      <div class="panel" id="kbPanel">
+        <h3>Knowledge base</h3>
+        <label>Upload a support doc (.txt)</label>
+        <div class="upload-row">
+          <input type="file" id="docFile">
+          <button class="btn btn-ghost btn-sm" onclick="uploadDoc()">Upload</button>
+        </div>
+        <div class="status-line" id="uploadStatus"></div>
+
+        <div class="field" style="margin-top:20px;">
+          <label>Search the knowledge base</label>
+          <div class="upload-row">
+            <input type="text" id="kbQueryInput" placeholder="e.g. refund policy">
+            <button class="btn btn-ghost btn-sm" onclick="queryKB()">Search</button>
+          </div>
+        </div>
+        <div class="kb-results" id="kbResults"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_BASE = "http://localhost:8000";
+
+window.addEventListener('beforeunload', () => {
+    console.log("PAGE IS RELOADING");
+});
+window.addEventListener('load', () => {
+    console.log("PAGE LOADED");
+});
+
+let currentSessionId = null;
+let currentScenario = "";
+let currentPersona = {};
+let conversationHistory = [];
+let frustrationHistory = [];
+
+function showSimulator(){
+  document.getElementById('dashboard-view').style.display = 'none';
+  document.getElementById('simulator-view').style.display = 'block';
+  document.getElementById('backBtn').style.display = 'inline-flex';
+}
+function showDashboard(){
+  document.getElementById('dashboard-view').style.display = 'block';
+  document.getElementById('simulator-view').style.display = 'none';
+  document.getElementById('backBtn').style.display = 'none';
+}
+
+function setStatus(elId, text, type){
+  const el = document.getElementById(elId);
+  el.textContent = text;
+  el.className = 'status-line' + (type ? ' ' + type : '');
+}
+
+async function createSession(){
+  const scenario = document.getElementById('scenarioInput').value.trim();
+  if(!scenario){
+    setStatus('createStatus', 'Please enter a scenario first.', 'err');
+    return;
+  }
+  const tone = document.getElementById('toneInput').value;
+  const patience = document.getElementById('patienceInput').value;
+  const context = document.getElementById('contextInput').value.trim();
+
+  currentScenario = scenario;
+  currentPersona = { tone, patience };
+
+  const btn = document.getElementById('createSessionBtn');
+  btn.disabled = true;
+  setStatus('createStatus', 'Creating session…');
+
+  try{
+    const res = await fetch(`${API_BASE}/session/`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'simulator', scenario, product_context: context || null })
+    });
+    if(!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    currentSessionId = data.id;
+
+    document.getElementById('metaScenario').textContent = scenario;
+    document.getElementById('metaTone').textContent = tone;
+    document.getElementById('metaPatience').textContent = patience;
+    document.getElementById('sessionPanels').style.display = 'block';
+    setStatus('createStatus', 'Session created.', 'ok');
+
+    document.getElementById('endSessionBtn').disabled = false;
+    document.getElementById('endSessionBtn').textContent = 'End session';
+    document.getElementById('agentReplyInput').disabled = false;
+    document.getElementById('sendReplyBtn').disabled = false;
+    startSessionTimer();
+
+    conversationHistory = [];
+    frustrationHistory = [];
+    document.getElementById('chatLog').innerHTML = '';
+    await requestCustomerTurn();
+  }catch(err){
+    setStatus('createStatus', `Couldn't create session — ${err.message}. Is the backend running?`, 'err');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+let sessionTimerInterval = null;
+let sessionStartTime = null;
+
+function startSessionTimer(){
+  clearInterval(sessionTimerInterval);
+  sessionStartTime = Date.now();
+  document.getElementById('metaDurationWrap').classList.remove('ended');
+  document.getElementById('metaDuration').textContent = '00:00:00';
+  sessionTimerInterval = setInterval(updateSessionTimer, 1000);
+}
+function updateSessionTimer(){
+  const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+  const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+  const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+  document.getElementById('metaDuration').textContent = `${h}:${m}:${s}`;
+}
+function endSession(){
+  clearInterval(sessionTimerInterval);
+  document.getElementById('metaDurationWrap').classList.add('ended');
+  document.getElementById('endSessionBtn').disabled = true;
+  document.getElementById('endSessionBtn').textContent = 'Session ended';
+  document.getElementById('agentReplyInput').disabled = true;
+  document.getElementById('sendReplyBtn').disabled = true;
+}
+function toggleCoachSuggestions(){
+  const grid = document.getElementById('coachCardsGrid');
+  const btn = document.getElementById('coachToggleBtn');
+  const isOpen = grid.style.display !== 'none';
+  grid.style.display = isOpen ? 'none' : 'grid';
+  btn.textContent = isOpen ? 'View suggested responses ▾' : 'Hide suggested responses ▴';
+}
+
+function appendMessage(sender, content){
+  const log = document.getElementById('chatLog');
+  const div = document.createElement('div');
+  div.className = `msg ${sender}`;
+  const who = sender === 'customer' ? 'Customer' : 'You (Agent)';
+  div.innerHTML = `<div class="who">${who}</div>${content}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+function setGauge(el, score, radius){
+  const r = radius || 32;
+  const c = 2 * Math.PI * r;
+  const val = Math.max(0, Math.min(100, score || 0));
+  const pct = val / 100;
+  el.style.strokeDasharray = `${c}`;
+  el.style.strokeDashoffset = `${c * (1 - pct)}`;
+  el.style.stroke = severityColor(val);
+}
+function severityColor(score){
+  if(score >= 70) return 'var(--red)';
+  if(score >= 40) return 'var(--amber)';
+  return 'var(--teal)';
+}
+function severityBadgeClass(score){
+  if(score >= 70) return 'badge-red';
+  if(score >= 40) return 'badge-amber';
+  return 'badge-green';
+}
+function trendArrow(trend){
+  if(!trend) return '';
+  const t = trend.toLowerCase();
+  if(t.includes('improv')) return '↓ ';
+  if(t.includes('declin') || t.includes('worsen')) return '↑ ';
+  return '— ';
+}
+function trendChipClass(trend){
+  if(!trend) return 'flat';
+  const t = trend.toLowerCase();
+  if(t.includes('improv')) return 'down';
+  if(t.includes('declin') || t.includes('worsen')) return 'up';
+  return 'flat';
+}
+function toneBadgeClass(tone){
+  if(!tone) return 'badge-neutral';
+  const t = tone.toLowerCase();
+  if(t.includes('empathetic')) return 'badge-green';
+  if(t.includes('firm')) return 'badge-neutral';
+  if(t.includes('concise')) return 'badge-amber';
+  return 'badge-neutral';
+}
+
+function renderSentiment(sentiment){
+  if(!sentiment) return;
+  document.getElementById('sentimentPanel').style.display = 'block';
+  const score = sentiment.frustration_score ?? 0;
+  document.getElementById('sentIntent').textContent = sentiment.intent || '—';
+  document.getElementById('sentScoreNum').textContent = sentiment.frustration_score ?? '—';
+  setGauge(document.getElementById('sentGaugeArc'), score, 32);
+  const emotionBadge = document.getElementById('sentEmotionBadge');
+  emotionBadge.textContent = sentiment.emotional_state || '—';
+  emotionBadge.className = 'badge ' + severityBadgeClass(score);
+
+  const trendChip = document.getElementById('sentTrendChip');
+  trendChip.textContent = trendArrow(sentiment.satisfaction_trend) + (sentiment.satisfaction_trend || '—');
+  trendChip.className = 'trend-chip ' + trendChipClass(sentiment.satisfaction_trend);
+
+  document.getElementById('sentReasoning').textContent = sentiment.reasoning || '';
+
+  frustrationHistory.push(score);
+  renderFrustrationSparkline();
+}
+
+function renderFrustrationSparkline(){
+  const el = document.getElementById('frustrationSparkline');
+  if(!frustrationHistory.length){
+    el.innerHTML = '<span class="spark-empty">No data yet</span>';
+    return;
+  }
+  el.innerHTML = '';
+  frustrationHistory.forEach(score => {
+    const bar = document.createElement('div');
+    bar.className = 'spark-bar';
+    const val = Math.max(0, Math.min(100, score || 0));
+    bar.style.height = Math.max(6, (val / 100) * 32) + 'px';
+    bar.style.backgroundColor = severityColor(val);
+    el.appendChild(bar);
+  });
+}
+
+function renderCoaching(coaching){
+  const panel = document.getElementById('coachingPanel');
+  if(!coaching){ panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  const grid = document.getElementById('coachCardsGrid');
+  grid.innerHTML = '';
+  grid.style.display = 'none';
+  document.getElementById('coachToggleBtn').textContent = 'View suggested responses ▾';
+  (coaching.suggested_responses || []).forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'coach-card';
+    const badgeClass = toneBadgeClass(s.tone);
+    const toneEl = document.createElement('span');
+    toneEl.className = 'badge ' + badgeClass;
+    toneEl.textContent = s.tone || 'Suggestion';
+    const textEl = document.createElement('p');
+    textEl.textContent = s.response || '';
+    card.appendChild(toneEl);
+    card.appendChild(textEl);
+    grid.appendChild(card);
+  });
+  document.getElementById('coachTip').textContent = coaching.coaching_tip || '';
+}
+
+function renderEscalation(escalation){
+  const panel = document.getElementById('escalationPanel');
+  if(!escalation){ panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  const score = escalation.escalation_risk_score ?? 0;
+
+  document.getElementById('escScoreNum').textContent = escalation.escalation_risk_score ?? '—';
+  setGauge(document.getElementById('escGaugeArc'), score, 46);
+
+  const levelBadge = document.getElementById('escLevelBadge');
+  levelBadge.textContent = escalation.risk_level || '—';
+  levelBadge.className = 'badge ' + severityBadgeClass(score);
+  document.getElementById('escScoreText').textContent = 'Risk score ' + (escalation.escalation_risk_score ?? '—') + ' of 100';
+
+  const banner = document.getElementById('escAlertBanner');
+  if(escalation.alert_triggered){
+    banner.style.display = 'flex';
+    document.getElementById('escAlertBody').textContent = escalation.recommended_intervention || 'Recommend supervisor visibility.';
+    panel.classList.add('alert-live');
+  }else{
+    banner.style.display = 'none';
+    panel.classList.remove('alert-live');
+  }
+}
+
+function renderKnowledgeSuggestions(suggestions){
+  const resultsEl = document.getElementById('kbResults');
+  if(!suggestions || !suggestions.length){
+    resultsEl.innerHTML = '<div class="kb-empty">No knowledge suggestions for this turn.</div>';
+    return;
+  }
+  resultsEl.innerHTML = '';
+  suggestions.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'kb-chunk';
+    div.textContent = s.content;
+    resultsEl.appendChild(div);
+  });
+}
+
+async function requestCustomerTurn(){
+  document.getElementById('typingIndicator').style.display = 'block';
+  document.getElementById('sendReplyBtn').disabled = true;
+  try{
+    const res = await fetch(`${API_BASE}/simulate/message`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        scenario: currentScenario,
+        persona: currentPersona,
+        conversation_history: conversationHistory,
+        session_id: currentSessionId
+      })
+    });
+    if(!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    conversationHistory.push({ sender:'customer', content: data.message });
+    appendMessage('customer', data.message);
+    renderSentiment(data.sentiment);
+    renderCoaching(data.coaching);
+    renderEscalation(data.escalation);
+    renderKnowledgeSuggestions(data.knowledge_suggestions);
+  }catch(err){
+    appendMessage('customer', `[Couldn't reach the simulator: ${err.message}]`);
+  }finally{
+    document.getElementById('typingIndicator').style.display = 'none';
+    document.getElementById('sendReplyBtn').disabled = false;
+  }
+}
+
+async function sendAgentReply(){
+  const input = document.getElementById('agentReplyInput');
+  const text = input.value.trim();
+  if(!text) return;
+  conversationHistory.push({ sender:'agent', content: text });
+  appendMessage('agent', text);
+  input.value = '';
+  await requestCustomerTurn();
+}
+
+document.getElementById('agentReplyInput').addEventListener('keydown', function(e){
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendAgentReply();
+  }
+});
+
+async function uploadDoc(){
+  if(!currentSessionId) return;
+  const fileInput = document.getElementById('docFile');
+  if(!fileInput.files.length){
+    setStatus('uploadStatus', 'Choose a file first.', 'err');
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+
+  setStatus('uploadStatus', 'Uploading…');
+  try{
+    const res = await fetch(`${API_BASE}/session/${currentSessionId}/upload-docs`, {
+      method:'POST',
+      body: formData
+    });
+    if(!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    setStatus('uploadStatus', `Uploaded — ${data.chunks_indexed} chunk(s) indexed.`, 'ok');
+  }catch(err){
+    setStatus('uploadStatus', `Upload failed — ${err.message}`, 'err');
+  }
+}
+
+async function queryKB(){
+  if(!currentSessionId) return;
+  const query = document.getElementById('kbQueryInput').value.trim();
+  const resultsEl = document.getElementById('kbResults');
+  if(!query){
+    resultsEl.innerHTML = '<div class="kb-empty">Enter a search term first.</div>';
+    return;
+  }
+  resultsEl.innerHTML = '<div class="kb-empty">Searching…</div>';
+  try{
+    const res = await fetch(`${API_BASE}/session/${currentSessionId}/query`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ query, k: 1 })
+    });
+    if(!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    if(!data.results.length){
+      resultsEl.innerHTML = '<div class="kb-empty">No matches found. Try uploading a document first.</div>';
+      return;
+    }
+    resultsEl.innerHTML = '';
+    data.results.forEach(r => {
+      const div = document.createElement('div');
+      div.className = 'kb-chunk';
+      div.textContent = r.content;
+      resultsEl.appendChild(div);
+    });
+  }catch(err){
+    resultsEl.innerHTML = `<div class="kb-empty">Search failed — ${err.message}</div>`;
+  }
+}
+</script>
+
+</body>
+</html>
