@@ -203,7 +203,7 @@ Several coaching panel components were initially built against a stale/incorrect
 ### Clone the repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/rachanabankar/AssistEdge
 cd AssistEdge
 ```
 
