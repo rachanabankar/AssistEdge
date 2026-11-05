@@ -1,7 +1,10 @@
 import { useState } from "react";
 import Card from "../common/Card";
 
-export default function ConversationPanel({ messages, onSend, isLoading }) {
+const SUBHEADER_CLASS = "text-[10px] font-semibold uppercase tracking-wide";
+const TYPING_DOT_CLASS = "h-1.5 w-1.5 rounded-full bg-[#0F766E] animate-bounce";
+
+export default function ConversationPanel({ messages = [], onSend, isLoading }) {
   const [draft, setDraft] = useState("");
 
   const handleSend = () => {
@@ -36,7 +39,7 @@ export default function ConversationPanel({ messages, onSend, isLoading }) {
               }`}
             >
               <div
-                className={`mb-1 text-[10px] font-semibold uppercase tracking-wide ${
+                className={`mb-1 ${SUBHEADER_CLASS} ${
                   m.sender === "agent"
                     ? "text-[#4338CA]"
                     : "text-[#0F766E]"
@@ -55,14 +58,14 @@ export default function ConversationPanel({ messages, onSend, isLoading }) {
         {isLoading && lastMessage?.sender === "agent" && (
           <div>
             <div className="inline-flex max-w-[85%] items-center gap-2 rounded-xl border border-[#D7F2F5] bg-[#F1FBFC] px-4 py-3 shadow-sm">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-[#0F766E]">
+              <span className={`${SUBHEADER_CLASS} text-[#0F766E]`}>
                 Customer is typing
               </span>
 
               <span className="flex gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#0F766E] animate-bounce [animation-delay:-0.3s]" />
-                <span className="h-1.5 w-1.5 rounded-full bg-[#0F766E] animate-bounce [animation-delay:-0.15s]" />
-                <span className="h-1.5 w-1.5 rounded-full bg-[#0F766E] animate-bounce" />
+                <span className={`${TYPING_DOT_CLASS} [animation-delay:-0.3s]`} />
+                <span className={`${TYPING_DOT_CLASS} [animation-delay:-0.15s]`} />
+                <span className={TYPING_DOT_CLASS} />
               </span>
             </div>
           </div>

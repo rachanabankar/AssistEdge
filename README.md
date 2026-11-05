@@ -19,6 +19,7 @@ The goal: turn reactive agent training into **proactive, in-session coaching**.
 - [Project Structure](#project-structure)
 - [Challenges & How They Were Solved](#challenges--how-they-were-solved)
 - [Getting Started](#getting-started)
+  - [Environment Setup](#environment-setup)
 - [Known Limitations & Future Work](#known-limitations--future-work)
 - [Acknowledgments](#acknowledgments)
 - [License](#license)
@@ -59,7 +60,7 @@ The goal: turn reactive agent training into **proactive, in-session coaching**.
 - SQLite via SQLAlchemy ORM (no Alembic — schema changes applied via one-off `ALTER TABLE` migration scripts)
 - LangChain + ChromaDB for RAG (knowledge base retrieval)
 - Local HuggingFace embeddings (`all-MiniLM-L6-v2`) — no external API cost
-- [OpenRouter](https://openrouter.ai) for the generative LLM, using the `openrouter/free` auto-router for stability against free-tier model congestion
+- [Groq](https://console.groq.com) for the generative LLM, using `llama-3.3-70b-versatile` for fast inference and coaching responses
 - `xhtml2pdf` for PDF report generation (pure Python, no system-level dependencies — chosen over WeasyPrint, which needs GTK system libraries that don't install cleanly on Windows)
 
 **Auth & Integrations**
@@ -92,7 +93,7 @@ Results persisted to Message row (sentiment_json, escalation_json)
 Live coaching UI updates
 ```
 
-Agents call the LLM directly via `utils/openrouter_client.py` (no agent framework) — each has its own system prompt (in `prompts/`) and parses the JSON response with markdown-fence stripping and a safe fallback if parsing fails.
+Agents call the LLM directly via `utils/groq_client.py` (no agent framework) — each has its own system prompt (in `prompts/`) and parses the JSON response with markdown-fence stripping and a safe fallback if parsing fails.
 
 At the end of a session, the **Summary Agent** reads all persisted messages and their sentiment/escalation data and produces the final report, which is then rendered to PDF via `xhtml2pdf` using `templates/report.html` and made available for download from the Reports dashboard.
 
@@ -194,7 +195,7 @@ Several coaching panel components were initially built against a stale/incorrect
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+
-- An [OpenRouter](https://openrouter.ai) API key (free tier works)
+- A [Groq](https://console.groq.com/keys) API key (free tier works)
 - A Google Cloud OAuth Client ID (only needed for Google login)
 - A [Resend](https://resend.com) API key and a verified sender email (needed for password-reset emails)
 
@@ -205,6 +206,24 @@ Several coaching panel components were initially built against a stale/incorrect
 ```bash
 git clone https://github.com/rachanabankar/AssistEdge
 cd AssistEdge
+```
+
+### Environment Setup
+
+Both the backend and frontend have `.env.example` templates with safe placeholder values. Copy each example file to `.env` and fill in your actual credentials:
+
+**Backend:**
+```bash
+# In the backend directory:
+cp .env.example .env          # macOS / Linux
+copy .env.example .env        # Windows
+```
+
+**Frontend:**
+```bash
+# In the frontend directory:
+cp .env.example .env          # macOS / Linux
+copy .env.example .env        # Windows
 ```
 
 ### Backend Setup
@@ -218,20 +237,28 @@ venv\Scripts\activate        # Windows
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in `backend/`:
+Ensure your `backend/.env` file is populated:
 
 ```env
-OPENROUTER_API_KEY=your_openrouter_api_key
-SECRET_KEY=your_jwt_signing_secret
-GOOGLE_CLIENT_ID=your_google_oauth_client_id
+# LLM provider (Groq)
+GROQ_API_KEY=your_groq_api_key_here
+
+# Authentication (JWT, Google OAuth)
+SECRET_KEY=your_jwt_signing_secret_here
+GOOGLE_CLIENT_ID=your_google_client_id_here.apps.googleusercontent.com
+
+# Frontend integration
 FRONTEND_BASE_URL=http://localhost:5173
-RESEND_API_KEY=your_resend_api_key
-RESEND_FROM_EMAIL=your_verified_sender_email
+
+# Email service (Resend)
+RESEND_API_KEY=re_your_resend_api_key_here
+RESEND_FROM_EMAIL=onboarding@resend.dev
 ```
 
-`SECRET_KEY` signs and verifies login JWTs in `backend/utils/auth.py` (`create_access_token` / `decode_access_token`, HS256, 24-hour expiry via `ACCESS_TOKEN_EXPIRE_MINUTES`) — use a long, random value in any real deployment, e.g. generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
-
-`RESEND_API_KEY` and `RESEND_FROM_EMAIL` are used to send password-reset emails via [Resend](https://resend.com) — `RESEND_FROM_EMAIL` must be a verified sender on your Resend account.
+- `GROQ_API_KEY` is required for live coaching, customer simulation, sentiment analysis, and summary report generation. Get a key from the [Groq Console](https://console.groq.com/keys).
+- `SECRET_KEY` signs and verifies login JWTs in `backend/utils/auth.py` (`create_access_token` / `decode_access_token`, HS256, 24-hour expiry via `ACCESS_TOKEN_EXPIRE_MINUTES`) — generate a secure random secret using `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+- `GOOGLE_CLIENT_ID` is optional, needed only for Google OAuth login.
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are used to send password-reset emails via [Resend](https://resend.com) — `RESEND_FROM_EMAIL` must be a verified sender on your Resend account.
 
 Run the server:
 
@@ -250,13 +277,16 @@ cd frontend
 npm install
 ```
 
-Create a `.env` file in `frontend/`:
+Ensure your `frontend/.env` file is populated:
 
 ```env
-VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
-```
+# Authentication (Google OAuth)
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here.apps.googleusercontent.com
 
-> **To verify:** check `frontend/src/services/api.js` for how the axios base URL is set. If the backend URL (`http://localhost:8000`) is hardcoded there rather than read from an env var, consider adding a `VITE_API_BASE_URL` entry here and wiring it into `api.js` so the frontend can point at a different backend without a code change (useful for deployment).
+# Backend endpoints (optional, fallbacks shown below)
+VITE_API_BASE_URL=http://localhost:8000
+VITE_WS_BASE_URL=ws://localhost:8000/ws
+```
 
 Run the dev server:
 

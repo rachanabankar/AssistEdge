@@ -1,3 +1,5 @@
+import hashlib
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -18,11 +20,26 @@ from utils.auth import (
     generate_reset_token,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
-FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+APP_ENV = os.getenv("APP_ENV", "development")
+_raw_frontend_url = os.getenv("FRONTEND_BASE_URL")
+if _raw_frontend_url is not None:
+    _raw_frontend_url = _raw_frontend_url.strip().rstrip("/")
+
+if not _raw_frontend_url:
+    if APP_ENV != "development":
+        raise RuntimeError(
+            "FRONTEND_BASE_URL must be set when APP_ENV is not 'development'."
+        )
+    FRONTEND_BASE_URL = "http://localhost:5173"
+else:
+    FRONTEND_BASE_URL = _raw_frontend_url
+
 RESET_TOKEN_EXPIRE_MINUTES = 30
 
 
@@ -145,14 +162,8 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
         "message": "If an account with that username or email exists, a reset link has been sent."
     }
 
-    if not agent:
-        # Don't reveal whether the account exists.
-        return generic_response
-
-    if not agent.email:
-        # Account exists but has no email on file (e.g. old username-only
-        # account that never linked an email). Nothing to send to — keep the
-        # response generic so this isn't distinguishable from "no account".
+    # Don't reveal whether the account exists or whether it has an email on file.
+    if not agent or not agent.email:
         return generic_response
 
     token = generate_reset_token()
@@ -164,20 +175,27 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     email_sent = send_password_reset_email(agent.email, reset_link)
 
     if not email_sent:
-        # Fallback for local dev when RESEND_API_KEY isn't configured, or if
-        # the send call fails for some other reason — keep the flow testable
-        # without blocking on email infra. Remove this block once email
-        # sending is confirmed reliable in your deployed environment.
-        print(f"\n[PASSWORD RESET] {agent.username} -> {reset_link}\n")
-        generic_response["dev_reset_link"] = reset_link
+        if os.getenv("APP_ENV") == "development":
+            print(f"\n[PASSWORD RESET] {agent.username} -> {reset_link}\n")
+            return {
+                "message": "If an account with that username or email exists, a reset link has been sent.",
+                "dev_reset_link": reset_link,
+            }
+        logger.error("Failed to send password reset email for agent_id=%s", agent.id)
 
     return generic_response
 
 # ---------- POST /auth/reset-password ----------
 @router.post("/reset-password")
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
-    agent = crud.get_agent_by_reset_token(db, payload.token)
-    if not agent or not agent.reset_token_expiry:
+    token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
+    agent = crud.get_agent_by_reset_token(db, token_hash)
+    if (
+        not agent
+        or not agent.reset_token
+        or not secrets.compare_digest(agent.reset_token, token_hash)
+        or not agent.reset_token_expiry
+    ):
         raise HTTPException(status_code=400, detail="Invalid or expired reset link")
 
     expiry = agent.reset_token_expiry

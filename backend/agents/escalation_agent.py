@@ -1,7 +1,7 @@
 import json
 
 from prompts.escalation_prompt import ESCALATION_SYSTEM_PROMPT
-from utils.openrouter_client import call_openrouter
+from utils.groq_client import call_groq
 
 ALERT_THRESHOLD = 70
 
@@ -22,21 +22,18 @@ def assess_escalation_risk(conversation_history: list, frustration_score_history
         "recommended_intervention": str
     }
     """
-
-    customer_messages = [t for t in conversation_history if t["sender"] == "customer"]
-    if not customer_messages:
+    if not any(t.get("sender") == "customer" for t in conversation_history):
         raise ValueError("No customer message found in conversation_history to analyze.")
 
-    transcript_lines = []
-    for turn in conversation_history:
-        role_label = "Customer" if turn["sender"] == "customer" else "Agent"
-        transcript_lines.append(f"{role_label}: {turn['content']}")
-    transcript = "\n".join(transcript_lines)
-
-    if frustration_score_history:
-        history_line = f"frustration_score_history: {frustration_score_history}"
-    else:
-        history_line = "frustration_score_history: not provided"
+    transcript = "\n".join(
+        f"{'Customer' if turn['sender'] == 'customer' else 'Agent'}: {turn['content']}"
+        for turn in conversation_history
+    )
+    history_line = (
+        f"frustration_score_history: {frustration_score_history}"
+        if frustration_score_history
+        else "frustration_score_history: not provided"
+    )
 
     user_prompt = (
         f"Conversation so far:\n\n{transcript}\n\n"
@@ -49,13 +46,13 @@ def assess_escalation_risk(conversation_history: list, frustration_score_history
         {"role": "user", "content": user_prompt},
     ]
 
-    raw_content = call_openrouter(messages, require_json=True)
+    raw_content = call_groq(messages, require_json=True)
     return _parse_json_response(raw_content)
 
 
 def _parse_json_response(raw_content: str) -> dict:
     """
-    openrouter/free sometimes wraps JSON in markdown fences or adds stray text.
+    The LLM sometimes wraps JSON in markdown fences or adds stray text.
     Strip that before parsing, and fall back to a safe default if parsing fails
     rather than crashing the whole request.
     """
@@ -91,13 +88,3 @@ def _parse_json_response(raw_content: str) -> dict:
             "reasoning": "Could not parse model output; returning a neutral default.",
             "recommended_intervention": "Review this conversation manually; automatic risk scoring failed.",
         }
-
-
-if __name__ == "__main__":
-    test_history = [
-        {"sender": "customer", "content": "My order was supposed to arrive 3 days ago and still nothing."},
-        {"sender": "agent", "content": "I'm sorry about that, let me check the tracking for you."},
-        {"sender": "customer", "content": "This is the third time I've reached out. If it's not fixed by tomorrow I'm cancelling my subscription and leaving a review warning others."},
-    ]
-    result = assess_escalation_risk(test_history)
-    print(json.dumps(result, indent=2))

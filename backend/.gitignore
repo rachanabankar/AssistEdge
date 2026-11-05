@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+*.db
+chroma*/
+uploads/
+venv/
+__pycache__/
+

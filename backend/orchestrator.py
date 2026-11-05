@@ -37,24 +37,23 @@ def run_coaching_pipeline(db: DBSession, session_id: str, updated_history: list)
         "escalation": dict | None,
     }
     """
-
     result = {
         "sentiment": None,
         "knowledge_suggestions": [],
         "coaching": None,
         "escalation": None,
     }
+    is_customer_turn = bool(updated_history and updated_history[-1].get("sender") == "customer")
 
-    # ---------- 1. Sentiment ----------
+    # 1. Sentiment
     try:
         result["sentiment"] = analyze_sentiment(updated_history)
     except Exception as e:
         print(f"Orchestrator: sentiment agent failed: {e}")
-        result["sentiment"] = None
 
     # Persist the frustration_score and full sentiment object onto the latest customer
     # message row, so both are available for frustration history and Replay Mode.
-    if result["sentiment"] and updated_history and updated_history[-1]["sender"] == "customer":
+    if result["sentiment"] and is_customer_turn:
         frustration_score = result["sentiment"].get("frustration_score")
         try:
             latest_customer_message = crud.get_latest_customer_message(db, session_id)
@@ -66,23 +65,21 @@ def run_coaching_pipeline(db: DBSession, session_id: str, updated_history: list)
         except Exception as e:
             print(f"Orchestrator: failed to persist sentiment/frustration_score: {e}")
 
-    # ---------- 2. Knowledge base ----------
+    # 2. Knowledge base
     try:
         result["knowledge_suggestions"] = recommend_knowledge(updated_history, session_id=session_id)
     except Exception as e:
         print(f"Orchestrator: knowledge agent failed: {e}")
-        result["knowledge_suggestions"] = []
 
-    # ---------- 3. Coaching suggestions (sentiment-aware) ----------
+    # 3. Coaching suggestions (sentiment-aware)
     try:
         result["coaching"] = generate_coaching_suggestions(
             updated_history, sentiment_context=result["sentiment"]
         )
     except Exception as e:
         print(f"Orchestrator: coaching agent failed: {e}")
-        result["coaching"] = None
 
-    # ---------- 4. Escalation risk (trend-aware) ----------
+    # 4. Escalation risk (trend-aware)
     try:
         frustration_history = crud.get_frustration_history(db, session_id)
         result["escalation"] = assess_escalation_risk(
@@ -90,12 +87,11 @@ def run_coaching_pipeline(db: DBSession, session_id: str, updated_history: list)
         )
     except Exception as e:
         print(f"Orchestrator: escalation agent failed: {e}")
-        result["escalation"] = None
 
     # Persist the full escalation object onto the latest customer message row.
     # Independent of sentiment's success — escalation is derived from DB history,
     # not this turn's live sentiment result.
-    if result["escalation"] and updated_history and updated_history[-1]["sender"] == "customer":
+    if result["escalation"] and is_customer_turn:
         try:
             latest_customer_message = crud.get_latest_customer_message(db, session_id)
             if latest_customer_message:

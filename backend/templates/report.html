@@ -85,7 +85,7 @@
 
   <section>
     <h2>Resolution Quality Score</h2>
-    <span class="score-badge">{{ report.resolution_score }}</span> / 100
+    <span class="score-badge">{{ report.resolution_score if report.resolution_score is not none else '—' }}</span>{% if report.resolution_score is not none %} / 100{% endif %}
   </section>
 
   <section>
@@ -106,8 +106,10 @@
     <h2>Coaching Recommendations</h2>
     {% for tip in coaching_tips %}
     <div class="tip-item">
-      <div>{{ tip.tip }}</div>
+      <div>{{ tip.tip if tip is mapping else tip }}</div>
+      {% if tip is mapping and tip.related_turn %}
       <div class="tip-turn">— referencing customer turn {{ tip.related_turn }}</div>
+      {% endif %}
     </div>
     {% endfor %}
   </section>

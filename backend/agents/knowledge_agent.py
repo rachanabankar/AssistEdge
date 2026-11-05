@@ -20,12 +20,12 @@ def recommend_knowledge(conversation_history: list, session_id: str, k: int = 2)
     session's KB is empty / retrieval fails — callers should treat that as
     "no suggestions yet," not an error.
     """
-
-    customer_messages = [t for t in conversation_history if t["sender"] == "customer"]
-    if not customer_messages:
+    latest_message = next(
+        (t["content"] for t in reversed(conversation_history) if t.get("sender") == "customer"),
+        None,
+    )
+    if not latest_message:
         return []
-
-    latest_message = customer_messages[-1]["content"]
 
     try:
         results = retrieve(latest_message, session_id=session_id, k=k)
@@ -43,16 +43,3 @@ def recommend_knowledge(conversation_history: list, session_id: str, k: int = 2)
             deduped.append(r)
 
     return deduped
-
-
-if __name__ == "__main__":
-    # Quick standalone test — replace with a real session_id that has
-    # uploaded docs indexed, otherwise this will just return an empty list.
-    test_history = [
-        {"sender": "customer", "content": "My order was supposed to arrive 3 days ago and still nothing."},
-    ]
-    test_session_id = "REPLACE_WITH_A_REAL_SESSION_ID"
-    results = recommend_knowledge(test_history, session_id=test_session_id)
-    print(f"Found {len(results)} result(s):")
-    for r in results:
-        print("-", r["content"][:100])

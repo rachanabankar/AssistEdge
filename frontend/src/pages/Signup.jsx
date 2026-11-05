@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,152 +8,317 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 /* Small inline icons — no new npm dependency required               */
 /* ---------------------------------------------------------------- */
 
-function IconUser({ className = '' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.7" />
-      <path
-        d="M4.5 19.5c1.4-3.2 4.2-5 7.5-5s6.1 1.8 7.5 5"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+const Svg = ({ children, className = '' }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    {children}
+  </svg>
+);
 
-function IconLock({ className = '' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <rect x="5" y="10.5" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.7" />
-      <path
-        d="M8 10.5V8a4 4 0 0 1 8 0v2.5"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+const s = {
+  stroke: 'currentColor',
+  strokeWidth: 1.7,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+};
 
-function IconEye({ className = '' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <path
-        d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="2.75" stroke="currentColor" strokeWidth="1.7" />
-    </svg>
-  );
-}
+const IconUser = ({ className }) => (
+  <Svg className={className}>
+    <circle cx="12" cy="8" r="3.5" {...s} />
+    <path d="M4.5 19.5c1.4-3.2 4.2-5 7.5-5s6.1 1.8 7.5 5" {...s} />
+  </Svg>
+);
 
-function IconEyeOff({ className = '' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <path
-        d="M3 3l18 18M9.9 9.9a2.75 2.75 0 0 0 3.9 3.9M6.2 6.5C3.9 8 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.7 0 3.1-.5 4.3-1.2M10.6 5.6c.45-.07.9-.1 1.4-.1 6 0 9.5 6.5 9.5 6.5s-.8 1.5-2.3 3"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+const IconMail = ({ className }) => (
+  <Svg className={className}>
+    <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" {...s} />
+    <path d="m4.5 7.5 7.5 5.5 7.5-5.5" {...s} />
+  </Svg>
+);
 
-function IconShield({ className = '' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <path
-        d="M12 3l7 3v5c0 4.7-3 8.4-7 10-4-1.6-7-5.3-7-10V6l7-3Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <path d="M9 12.2l2 2 4-4.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+const IconLock = ({ className }) => (
+  <Svg className={className}>
+    <rect x="5" y="10.5" width="14" height="9" rx="2" {...s} />
+    <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" {...s} />
+  </Svg>
+);
 
-function IconBolt({ className = '' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <path d="M12.5 2.5 5 14h5.5L11 21.5 19 10h-5.5l-1-7.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-    </svg>
-  );
-}
+const IconEye = ({ className }) => (
+  <Svg className={className}>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" {...s} />
+    <circle cx="12" cy="12" r="2.75" {...s} />
+  </Svg>
+);
 
-function IconLockCheck({ className = '' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <rect x="4.5" y="10.5" width="15" height="9.5" rx="2" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M7.5 10.5V8a4.5 4.5 0 0 1 9 0v2.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M9.5 15l1.8 1.8L14.5 13" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+const IconEyeOff = ({ className }) => (
+  <Svg className={className}>
+    <path
+      d="M3 3l18 18M9.9 9.9a2.75 2.75 0 0 0 3.9 3.9M6.2 6.5C3.9 8 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.7 0 3.1-.5 4.3-1.2M10.6 5.6c.45-.07.9-.1 1.4-.1 6 0 9.5 6.5 9.5 6.5s-.8 1.5-2.3 3"
+      {...s}
+    />
+  </Svg>
+);
 
-function IconHeart({ className = '' }) {
+const IconShield = ({ className }) => (
+  <Svg className={className}>
+    <path d="M12 3l7 3v5c0 4.7-3 8.4-7 10-4-1.6-7-5.3-7-10V6l7-3Z" {...s} />
+    <path d="M9 12.2l2 2 4-4.2" {...s} />
+  </Svg>
+);
+
+const IconArrowLeft = ({ className }) => (
+  <Svg className={className}>
+    <path d="M19 12H5M11 6l-6 6 6 6" {...s} />
+  </Svg>
+);
+
+const IconArrowRight = ({ className }) => (
+  <Svg className={className}>
+    <path d="M5 12h14M13 6l6 6-6 6" {...s} />
+  </Svg>
+);
+
+const IconSparkle = ({ className }) => (
+  <Svg className={className}>
+    <path d="M10 4l1.6 4.4L16 10l-4.4 1.6L10 16l-1.6-4.4L4 10l4.4-1.6L10 4Z" {...s} />
+    <path d="M17.5 14l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z" {...s} strokeWidth={1.4} />
+  </Svg>
+);
+
+const IconBook = ({ className }) => (
+  <Svg className={className}>
+    <path d="M12 6.5C10.3 5.3 8 5 5 5v12.5c3 0 5.3.3 7 1.5m0-12.5c1.7-1.2 4-1.5 7-1.5v12.5c-3 0-5.3.3-7 1.5m0-12.5V19" {...s} />
+  </Svg>
+);
+
+const IconTrend = ({ className }) => (
+  <Svg className={className}>
+    <path d="M4 17l5-5 3.5 3.5L20 8" {...s} />
+    <path d="M15 8h5v5" {...s} />
+  </Svg>
+);
+
+const IconCheck = ({ className }) => (
+  <Svg className={className}>
+    <path d="M5 12.5l4.2 4.2L19 7" {...s} strokeWidth={2.2} />
+  </Svg>
+);
+
+const IconAlert = ({ className }) => (
+  <Svg className={className}>
+    <circle cx="12" cy="12" r="9" {...s} />
+    <path d="M12 7.5v5M12 16.2v.1" {...s} strokeWidth={2} />
+  </Svg>
+);
+
+/* ---------------------------------------------------------------- */
+/* Input row — icon chip + borderless input, same look as Login      */
+/* ---------------------------------------------------------------- */
+
+function Field({
+  label,
+  icon: Icon,
+  chip = 'bg-indigo-50 text-indigo-600',
+  type = 'text',
+  value,
+  onChange,
+  placeholder,
+  autoComplete,
+  minLength,
+  invalid = false,
+  trailing,
+  children,
+}) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M12 20.5s-7.5-4.6-9.7-9.2C.9 8 2.3 4.8 5.6 4.1c2-.4 3.9.5 5 2.1a5.4 5.4 0 0 1 1.4-1.6c1.5-1.2 3.5-1.4 5.2-.5 2.8 1.4 3.6 4.9 1.7 7.9-2.2 3.5-6.9 8.5-6.9 8.5Z" />
-    </svg>
+    <div>
+      {/* CHANGED: label text-[15px] mb-2 -> text-sm mb-1.5 */}
+      <label className="block text-sm font-semibold text-slate-800 mb-1.5">{label}</label>
+      <div
+        /* CHANGED: h-[54px] -> h-[46px] */
+        className={`flex items-center gap-3 rounded-2xl border bg-white/80 px-2.5 h-[46px] transition focus-within:bg-white focus-within:ring-4 ${
+          invalid
+            ? 'border-red-300 focus-within:border-red-400 focus-within:ring-red-100'
+            : 'border-slate-200 hover:border-slate-300 focus-within:border-indigo-400 focus-within:ring-indigo-100'
+        }`}
+      >
+        <span
+          /* CHANGED: w-9 h-9 -> w-8 h-8 */
+          className={`w-8 h-8 shrink-0 rounded-xl flex items-center justify-center ${
+            invalid ? 'bg-red-50 text-red-500' : chip
+          }`}
+        >
+          <Icon className="w-[18px] h-[18px]" />
+        </span>
+        <input
+          type={type}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          required
+          minLength={minLength}
+          autoComplete={autoComplete}
+          /* CHANGED: added [&::-ms-reveal]:hidden so the browser's own reveal icon never clashes with ours */
+          className="flex-1 min-w-0 bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
+        />
+        {/* CHANGED: trailing wrapper is now relative z-10 flex so the eye button can always be clicked */}
+        {trailing && <div className="relative z-10 flex items-center pr-1.5">{trailing}</div>}
+      </div>
+      {children}
+    </div>
   );
 }
 
 /* ---------------------------------------------------------------- */
-/* Hero illustration — robot + laptop chat mockup                    */
-/* (identical to Login.jsx, kept in sync for visual parity)          */
+/* Password strength                                                 */
 /* ---------------------------------------------------------------- */
 
-function HeroIllustration() {
+const STRENGTH = [
+  { label: '', bar: 'bg-slate-200', text: 'text-slate-400' },
+  { label: 'Weak', bar: 'bg-red-400', text: 'text-red-500' },
+  { label: 'Fair', bar: 'bg-amber-400', text: 'text-amber-600' },
+  { label: 'Good', bar: 'bg-lime-500', text: 'text-lime-600' },
+  { label: 'Strong', bar: 'bg-emerald-500', text: 'text-emerald-600' },
+];
+
+function scorePassword(pw) {
+  if (!pw) return 0;
+  const passed = [
+    pw.length >= 8,
+    /[a-z]/.test(pw) && /[A-Z]/.test(pw),
+    /\d/.test(pw),
+    /[^A-Za-z0-9]/.test(pw),
+  ].filter(Boolean).length;
+  // Under 8 chars is capped at "Weak" so the meter agrees with minLength.
+  return pw.length < 8 ? Math.min(passed, 1) || 1 : Math.max(passed, 1);
+}
+
+/* ---------------------------------------------------------------- */
+/* Floating hero cards (left side) — mirrors the Login hero          */
+/* ---------------------------------------------------------------- */
+
+function Pill({ tone, children }) {
+  const tones = {
+    green: 'bg-emerald-50 text-emerald-600',
+    indigo: 'bg-indigo-50 text-indigo-600',
+    red: 'bg-red-50 text-red-500',
+  };
   return (
-    <svg viewBox="0 0 420 300" className="w-full max-w-md mx-auto" role="img" aria-label="AssistEdge assistant helping with live chat">
-      <defs>
-        <linearGradient id="botGrad2" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#818CF8" />
-          <stop offset="100%" stopColor="#7C3AED" />
-        </linearGradient>
-        <linearGradient id="screenGrad2" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#EEF2FF" />
-          <stop offset="100%" stopColor="#E0E7FF" />
-        </linearGradient>
-      </defs>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${tones[tone]}`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+      {children}
+    </span>
+  );
+}
 
-      <ellipse cx="210" cy="278" rx="150" ry="12" fill="#C7D2FE" opacity="0.5" />
+function HeroCards() {
+  return (
+    <div className="relative w-full max-w-[600px] h-[400px] mt-12">
+      {/* decorative rings */}
+      <div className="absolute left-[140px] top-[30px] w-[330px] h-[330px] rounded-full border border-dashed border-indigo-200/80" />
+      <div className="absolute left-[185px] top-[75px] w-[240px] h-[240px] rounded-full border border-indigo-200/60" />
 
-      <rect x="120" y="70" width="220" height="145" rx="14" fill="#1E1B4B" />
-      <rect x="132" y="82" width="196" height="121" rx="6" fill="url(#screenGrad2)" />
-      <rect x="95" y="215" width="270" height="14" rx="7" fill="#312E81" />
+      {/* Sentiment journey */}
+      <div className="ae-float absolute left-0 top-0 w-[290px] rounded-2xl bg-white shadow-[0_12px_40px_-12px_rgba(79,70,229,0.28)] ring-1 ring-indigo-50 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <IconTrend className="w-[18px] h-[18px]" />
+            </span>
+            <span className="text-sm font-semibold text-slate-800">Sentiment journey</span>
+          </div>
+          <Pill tone="green">Improving</Pill>
+        </div>
+        <svg viewBox="0 0 240 64" className="mt-3 w-full h-16" aria-hidden="true">
+          <defs>
+            <linearGradient id="spark-line" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#F87171" />
+              <stop offset="50%" stopColor="#A78BFA" />
+              <stop offset="100%" stopColor="#34D399" />
+            </linearGradient>
+            <linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#A78BFA" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#A78BFA" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d="M4 52 C40 54 56 30 90 38 S142 54 166 26 S214 10 236 8 V64 H4 Z" fill="url(#spark-fill)" />
+          <path
+            d="M4 52 C40 54 56 30 90 38 S142 54 166 26 S214 10 236 8"
+            stroke="url(#spark-line)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <circle cx="236" cy="8" r="4.5" fill="#10B981" />
+        </svg>
+        <div className="flex justify-between text-[11px] text-slate-400 -mt-0.5">
+          <span>Frustrated</span>
+          <span>Satisfied</span>
+        </div>
+      </div>
 
-      <rect x="144" y="94" width="120" height="20" rx="10" fill="#C7D2FE" />
-      <rect x="144" y="122" width="150" height="20" rx="10" fill="#818CF8" />
-      <rect x="164" y="152" width="120" height="20" rx="10" fill="#C7D2FE" />
-      <rect x="144" y="180" width="90" height="16" rx="8" fill="#7C3AED" />
+      {/* Coaching tip */}
+      <div
+        className="ae-float absolute left-[210px] top-[130px] w-[310px] rounded-2xl bg-white shadow-[0_12px_40px_-12px_rgba(124,58,237,0.3)] ring-1 ring-purple-50 p-4"
+        style={{ animationDelay: '1.2s' }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+              <IconSparkle className="w-[18px] h-[18px]" />
+            </span>
+            <span className="text-sm font-semibold text-slate-800">Coaching tip</span>
+          </div>
+          <Pill tone="indigo">Live</Pill>
+        </div>
+        <div className="mt-3 rounded-xl bg-emerald-50 px-3.5 py-3 text-[13px] leading-snug text-slate-700">
+          Acknowledge the delay first, then offer a clear next step with a timeline.
+        </div>
+      </div>
 
-      <rect x="360" y="230" width="26" height="24" rx="4" fill="#A5B4FC" />
-      <path d="M373 230c-4-14-20-18-24-30 16 2 26 14 24 30Z" fill="#34D399" />
-      <path d="M373 230c4-12 18-14 22-24-14 0-24 10-22 24Z" fill="#10B981" />
+      {/* Resolution score */}
+      <div
+        className="ae-float absolute left-[20px] top-[270px] w-[250px] rounded-2xl bg-white shadow-[0_12px_40px_-12px_rgba(79,70,229,0.25)] ring-1 ring-indigo-50 p-4 flex items-center gap-4"
+        style={{ animationDelay: '2.2s' }}
+      >
+        <div className="relative w-14 h-14 shrink-0">
+          <svg viewBox="0 0 40 40" className="w-14 h-14 -rotate-90" aria-hidden="true">
+            <circle cx="20" cy="20" r="16" fill="none" stroke="#E0E7FF" strokeWidth="4" />
+            <circle
+              cx="20"
+              cy="20"
+              r="16"
+              fill="none"
+              stroke="#10B981"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeDasharray="86.5 100.5"
+            />
+          </svg>
+          <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-slate-800">
+            86
+          </span>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-800">Resolution score</p>
+          <div className="mt-1">
+            <Pill tone="green">Great</Pill>
+          </div>
+        </div>
+      </div>
 
-      <g transform="translate(28,60)">
-        <ellipse cx="45" cy="215" rx="46" ry="9" fill="#C7D2FE" opacity="0.6" />
-        <rect x="10" y="120" width="70" height="85" rx="20" fill="url(#botGrad2)" />
-        <rect x="26" y="140" width="38" height="26" rx="8" fill="white" opacity="0.85" />
-        <circle cx="45" cy="70" r="42" fill="url(#botGrad2)" />
-        <circle cx="45" cy="70" r="32" fill="#EEF2FF" />
-        <circle cx="33" cy="70" r="5" fill="#312E81" />
-        <circle cx="57" cy="70" r="5" fill="#312E81" />
-        <path d="M33 84c4 5 16 5 24 0" stroke="#312E81" strokeWidth="3" strokeLinecap="round" fill="none" />
-        <line x1="45" y1="28" x2="45" y2="10" stroke="#7C3AED" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="45" cy="7" r="6" fill="#FBBF24" />
-        <path d="M8 68a37 37 0 0 1 74 0" stroke="#4C1D95" strokeWidth="4" fill="none" strokeLinecap="round" />
-        <rect x="2" y="62" width="12" height="20" rx="6" fill="#4C1D95" />
-        <rect x="76" y="62" width="12" height="20" rx="6" fill="#4C1D95" />
-      </g>
-    </svg>
+      {/* Knowledge match */}
+      <div
+        className="ae-float absolute left-[285px] top-[305px] w-[230px] rounded-2xl bg-white shadow-[0_12px_40px_-12px_rgba(14,165,233,0.25)] ring-1 ring-sky-50 px-4 py-3 flex items-center gap-3"
+        style={{ animationDelay: '3s' }}
+      >
+        <span className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+          <IconBook className="w-[18px] h-[18px]" />
+        </span>
+        <div>
+          <p className="text-xs font-semibold text-sky-700">Knowledge match</p>
+          <p className="text-[13px] text-slate-600">Refund &amp; returns policy</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -174,8 +339,10 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const passwordsMismatch =
-    confirmPassword.length > 0 && password !== confirmPassword;
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const score = useMemo(() => scorePassword(password), [password]);
+  const strength = STRENGTH[score];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -192,7 +359,7 @@ export default function Signup() {
       // auth.py's signup payload shape is unconfirmed beyond {username, password}.
       // Flag if the backend actually accepts/expects a name field.
       await signup({ username, password });
-      navigate('/');
+      navigate('/dashboard', { replace: true }); // CHANGED: was '/LandingDashboard' (not a real route)
     } catch (err) {
       const detail = err?.response?.data?.detail;
       let message = 'Signup failed. Please try again.';
@@ -215,7 +382,7 @@ export default function Signup() {
     setError('');
     try {
       await googleLogin(response.credential);
-      navigate('/');
+      navigate('/dashboard', { replace: true }); // CHANGED: was '/' (landing page)
     } catch (err) {
       const detail = err?.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : 'Google sign-up failed. Please try again.');
@@ -223,9 +390,7 @@ export default function Signup() {
   };
 
   // Loads Google's Identity Services script once and renders their button
-  // into our own button-shaped container, so we don't have to touch
-  // index.html for this. Reuses the script tag Login.jsx may have already
-  // injected, so it's not fetched twice if the user visited /login first.
+  // into our container. Reuses the script tag Login.jsx may have injected.
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
       console.warn('VITE_GOOGLE_CLIENT_ID is not set — Google sign-up is disabled.');
@@ -238,10 +403,7 @@ export default function Signup() {
         client_id: GOOGLE_CLIENT_ID,
         callback: handleGoogleResponse,
       });
-      // Defer measuring the container's width until after the browser has
-      // finished laying out the page. Measuring synchronously on mount can
-      // catch the flex/grid ancestors mid-layout and return 0, which makes
-      // Google render the button at zero width (i.e. invisible).
+      // Defer measuring until after layout so we don't get a 0px-wide button.
       requestAnimationFrame(() => {
         if (!googleButtonRef.current) return;
         const containerWidth = googleButtonRef.current.offsetWidth || 320;
@@ -250,9 +412,7 @@ export default function Signup() {
           size: 'large',
           shape: 'rectangular',
           logo_alignment: 'center',
-          // Google caps the rendered button around 400px regardless of what's
-          // passed, so request the smaller of the two to avoid asking for
-          // (and visually expecting) width it will never actually use.
+          // Google caps the rendered button around 400px.
           width: Math.min(containerWidth, 400),
           text: 'signup_with',
         });
@@ -277,247 +437,302 @@ export default function Signup() {
     script.defer = true;
     script.onload = initializeGoogle;
     document.body.appendChild(script);
-    // Intentionally not removing the script on unmount — Login.jsx can
-    // reuse it via the `existingScript` branch above.
+    // Intentionally not removing the script on unmount — Login.jsx can reuse it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const features = [
-    {
-      icon: IconUser,
-      title: 'Live Response Guidance',
-      description: 'Get real-time AI suggestions while you chat with customers.',
-    },
-    {
-      icon: IconBolt,
-      title: 'AI-Powered Assistance',
-      description: 'Smart answers, context-aware suggestions, faster resolutions.',
-    },
-    {
-      icon: IconShield,
-      title: 'Improve Performance',
-      description: 'Resolve queries faster and improve customer satisfaction.',
-    },
-  ];
+  // CHANGED: explicit toggle handlers (clearer than inline functional updates passed around)
+  const togglePassword = () => setShowPassword((v) => !v);
+  const toggleConfirmPassword = () => setShowConfirmPassword((v) => !v);
+
+  const eyeToggle = (shown, onToggle) => (
+    <button
+      type="button"
+      onClick={onToggle}
+      /* CHANGED: keep focus on the input so clicking the eye doesn't interfere with the type switch */
+      onMouseDown={(e) => e.preventDefault()}
+      aria-label={shown ? 'Hide password' : 'Show password'}
+      title={shown ? 'Hide password' : 'Show password'}
+      aria-pressed={shown}
+      className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+    >
+      {shown ? <IconEyeOff className="w-5 h-5" /> : <IconEye className="w-5 h-5" />}
+    </button>
+  );
 
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-b from-[#F4F3FF] via-[#F7F6FF] to-white flex flex-col">
-      {/* Top bar */}
-      <div className="max-w-6xl w-full mx-auto px-6 pt-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+    /* CHANGED: min-h-screen -> h-[100dvh] so the page is exactly one screen tall and cannot scroll */
+    <div className="relative h-[100dvh] overflow-hidden flex flex-col bg-gradient-to-br from-[#EEF0FF] via-[#F5F3FF] to-[#F3E8FF]">
+      {/* floating-card animation (respects reduced motion) */}
+      <style>{`
+        @keyframes ae-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        .ae-float { animation: ae-float 6s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .ae-float { animation: none; } }
+        /* CHANGED: scale both columns down on short windows so everything fits without scrolling */
+        @media (max-height: 780px) { .ae-fit { zoom: 0.93; } }
+        @media (max-height: 680px) { .ae-fit { zoom: 0.8; } }
+      `}</style>
+
+      {/* backdrop: soft blobs + dotted texture */}
+      <div className="pointer-events-none absolute -top-40 -left-32 w-[520px] h-[520px] rounded-full bg-indigo-200/40 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/3 left-1/3 w-[460px] h-[460px] rounded-full bg-sky-200/40 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-40 -right-24 w-[520px] h-[520px] rounded-full bg-purple-300/40 blur-3xl" />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-60"
+        style={{
+          backgroundImage: 'radial-gradient(#C7D2FE 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+          maskImage: 'radial-gradient(ellipse at 35% 50%, black 10%, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(ellipse at 35% 50%, black 10%, transparent 70%)',
+        }}
+      />
+
+      {/* top bar */}
+      {/* CHANGED: pt-6 -> pt-4 */}
+      <header className="relative z-10 w-full px-6 sm:px-[70px] pt-4 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-3">
+          {/* CHANGED: w-12 h-12 text-xl -> w-10 h-10 text-lg */}
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-200">
             A
           </div>
-          <span className="text-lg font-bold text-slate-900">AssistEdge</span>
-        </div>
-        <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500">
-          <span>Better support. Smarter every day.</span>
-          <IconHeart className="w-3.5 h-3.5 text-indigo-400" />
-        </div>
-      </div>
+          <span className="text-2xl font-bold tracking-tight text-slate-900">AssistEdge</span>
+        </Link>
+        <Link
+          to="/"
+          /* CHANGED: py-2.5 -> py-2 */
+          className="inline-flex items-center gap-2 rounded-full bg-white/80 backdrop-blur px-5 py-2 text-[15px] font-medium text-slate-700 shadow-sm ring-1 ring-white hover:bg-white transition"
+        >
+          <IconArrowLeft className="w-4 h-4" />
+          Back to home
+        </Link>
+      </header>
 
-      {/* Main content */}
-      <div className="max-w-6xl w-full mx-auto px-6 flex-1 min-h-0 grid lg:grid-cols-2 gap-10 items-center">
-        {/* Left: marketing panel */}
-        <div className="hidden lg:block">
-          <h1 className="text-[26px] font-extrabold text-slate-900 leading-[1.2]">
-            AI-Powered
+      {/* main */}
+      {/* CHANGED: py-8 -> py-3, added min-h-0 so it can shrink inside the fixed-height page */}
+      <main className="relative z-10 flex-1 min-h-0 w-full max-w-[1280px] mx-auto px-6 sm:px-[70px] py-3 grid lg:grid-cols-[1.2fr_0.8fr] gap-10 items-center">
+        {/* Left: hero */}
+        {/* CHANGED: added ae-fit */}
+        <section className="hidden lg:block pl-[40px] ae-fit">
+          <h1 className="text-[54px] xl:text-[60px] font-extrabold leading-[1.08] tracking-tight text-slate-900">
+            Start coaching
             <br />
-            <span className="text-indigo-600">Customer Support Agent</span>
-            <br />
-            with Live Response Guidance
+            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-500 bg-clip-text text-transparent">
+              smarter, today
+            </span>
           </h1>
-          <p className="text-sm text-slate-500 mt-3 max-w-md">
-            Join AssistEdge and empower your support team with real-time AI assistance
-            and exceptional customer experiences.
+          <p className="mt-5 text-lg text-slate-500 max-w-lg leading-relaxed">
+            Create your account and get real-time sentiment, knowledge and coaching
+            guidance on every customer conversation.
           </p>
-
-          <div className="mt-5 space-y-3">
-            {features.map(({ icon: Icon, title, description }) => (
-              <div key={title} className="flex items-start gap-3">
-                <div className="w-9 h-9 shrink-0 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <Icon className="w-4 h-4 text-indigo-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900 text-sm">{title}</p>
-                  <p className="text-xs text-slate-500">{description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 max-w-[240px]">
-            <HeroIllustration />
-          </div>
-        </div>
+          <HeroCards />
+        </section>
 
         {/* Right: signup card */}
-        <div className="bg-white rounded-3xl shadow-xl border border-indigo-50 p-6 sm:p-7 my-4 max-h-full overflow-y-auto">
-          <h2 className="text-xl font-bold text-slate-900">Create Account ✨</h2>
-          <p className="text-sm text-slate-500 mt-1 mb-4">
-            Join AssistEdge and elevate your coaching experience.
-          </p>
+        {/* CHANGED: added ae-fit */}
+        <section className="w-full max-w-[550px] mx-auto lg:mx-0 lg:justify-self-center ae-fit">
+          <div className="relative overflow-hidden rounded-[28px] bg-white/90 backdrop-blur shadow-[0_30px_80px_-30px_rgba(79,70,229,0.35)] ring-1 ring-white">
+            <div className="h-1.5 w-full bg-gradient-to-r from-indigo-600 via-purple-500 to-sky-400" />
 
-          {error && (
-            <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              {error}
-            </div>
-          )}
+            {/* CHANGED: p-7 sm:p-9 -> p-5 sm:p-6 */}
+            <div className="p-5 sm:p-6">
+              {/* CHANGED: text-[34px] -> text-[28px] */}
+              <h2 className="text-[28px] font-extrabold tracking-tight text-slate-900">
+                Create account <span aria-hidden>✨</span>
+              </h2>
+              {/* CHANGED: mt-1.5 -> mt-1, text-[15px] -> text-sm */}
+              <p className="mt-1 text-sm text-slate-500">
+                Join AssistEdge and elevate your coaching experience.
+              </p>
 
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="relative">
-              <IconUser className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Full name"
-                required
-                autoComplete="name"
-                className="w-full rounded-xl border border-gray-300 pl-11 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="relative">
-              <IconUser className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Email or Username"
-                required
-                autoComplete="username"
-                className="w-full rounded-xl border border-gray-300 pl-11 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="relative">
-              <IconLock className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Create a password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                className="w-full rounded-xl border border-gray-300 pl-11 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                aria-pressed={showPassword}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
-              >
-                {showPassword ? <IconEyeOff className="w-5 h-5" /> : <IconEye className="w-5 h-5" />}
-              </button>
-            </div>
-
-            <div className="relative">
-              <IconLock className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                required
-                autoComplete="new-password"
-                className={`w-full rounded-xl border pl-11 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
-                  passwordsMismatch
-                    ? 'border-red-300 focus:ring-red-400'
-                    : 'border-gray-300 focus:ring-indigo-500'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword((v) => !v)}
-                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                aria-pressed={showConfirmPassword}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
-              >
-                {showConfirmPassword ? <IconEyeOff className="w-5 h-5" /> : <IconEye className="w-5 h-5" />}
-              </button>
-              {passwordsMismatch && (
-                <p className="text-xs text-red-500 mt-1">Passwords don't match.</p>
+              {error && (
+                <div
+                  role="alert"
+                  /* CHANGED: mt-5 -> mt-3, py-3 -> py-2 */
+                  className="mt-3 flex items-start gap-2.5 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2"
+                >
+                  <IconAlert className="w-5 h-5 shrink-0 text-red-500 mt-px" />
+                  <span>{error}</span>
+                </div>
               )}
-            </div>
 
-            <label className="flex items-start gap-2 text-sm text-slate-600 select-none">
-              <input
-                type="checkbox"
-                checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              <span>
-                I agree to the{' '}
-                <span className="text-indigo-600 cursor-not-allowed" title="Coming soon">
-                  Terms of Service
-                </span>{' '}
-                and{' '}
-                <span className="text-indigo-600 cursor-not-allowed" title="Coming soon">
-                  Privacy Policy
+              {/* CHANGED: mt-6 space-y-4 -> mt-4 space-y-3 */}
+              <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+                <Field
+                  label="Full name"
+                  icon={IconUser}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Jane Doe"
+                  autoComplete="name"
+                />
+
+                <Field
+                  label="Email or username"
+                  icon={IconMail}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="you@company.com"
+                  autoComplete="username"
+                />
+
+                <Field
+                  label="Password"
+                  icon={IconLock}
+                  chip="bg-purple-50 text-purple-600"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  /* CHANGED: uses togglePassword */
+                  trailing={eyeToggle(showPassword, togglePassword)}
+                >
+                  {password.length > 0 ? (
+                    /* CHANGED: mt-2.5 -> mt-2 */
+                    <div className="mt-2 flex items-center gap-1.5">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                            i <= score ? strength.bar : 'bg-slate-200'
+                          }`}
+                        />
+                      ))}
+                      <span className={`ml-2 w-14 text-right text-xs font-semibold ${strength.text}`}>
+                        {strength.label}
+                      </span>
+                    </div>
+                  ) : (
+                    /* CHANGED: mt-2 -> mt-1.5 */
+                    <p className="mt-1.5 text-xs text-slate-400">
+                      Use 8+ characters with a mix of letters, numbers and symbols.
+                    </p>
+                  )}
+                </Field>
+
+                <Field
+                  label="Confirm password"
+                  icon={IconLock}
+                  chip="bg-purple-50 text-purple-600"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter your password"
+                  autoComplete="new-password"
+                  invalid={passwordsMismatch}
+                  /* CHANGED: uses toggleConfirmPassword */
+                  trailing={eyeToggle(showConfirmPassword, toggleConfirmPassword)}
+                >
+                  {(passwordsMismatch || passwordsMatch) && (
+                    <p
+                      /* CHANGED: mt-2 -> mt-1.5 */
+                      className={`mt-1.5 flex items-center gap-1.5 text-xs font-medium ${
+                        passwordsMismatch ? 'text-red-500' : 'text-emerald-600'
+                      }`}
+                    >
+                      {passwordsMismatch ? (
+                        <>
+                          <IconAlert className="w-3.5 h-3.5" /> Passwords don't match.
+                        </>
+                      ) : (
+                        <>
+                          <IconCheck className="w-3.5 h-3.5" /> Passwords match.
+                        </>
+                      )}
+                    </p>
+                  )}
+                </Field>
+
+                {/* CHANGED: text-[15px] -> text-sm, pt-1 -> pt-0 */}
+                <label className="flex items-start gap-3 text-sm text-slate-600 select-none cursor-pointer pt-0">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="mt-0.5 w-[18px] h-[18px] rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <span className="font-medium text-indigo-600 cursor-not-allowed" title="Coming soon">
+                      Terms of Service
+                    </span>{' '}
+                    and{' '}
+                    <span className="font-medium text-indigo-600 cursor-not-allowed" title="Coming soon">
+                      Privacy Policy
+                    </span>
+                  </span>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={submitting || !agreedToTerms}
+                  /* CHANGED: h-[58px] text-lg -> h-[48px] text-base */
+                  className="group w-full h-[48px] flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-base font-semibold shadow-lg shadow-indigo-300/50 transition hover:shadow-xl hover:shadow-indigo-300/60 hover:-translate-y-px active:translate-y-0 disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 disabled:cursor-not-allowed"
+                >
+                  {submitting ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
+                        <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                      Creating account…
+                    </>
+                  ) : (
+                    <>
+                      Sign Up
+                      <IconArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* CHANGED: my-6 -> my-3 */}
+              <div className="flex items-center gap-4 my-3">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-xs font-semibold tracking-[0.12em] text-slate-400 uppercase">
+                  Or continue with
                 </span>
-              </span>
-            </label>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
 
-            <button
-              type="submit"
-              disabled={submitting || !agreedToTerms}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-2.5 hover:opacity-90 disabled:opacity-50 transition"
-            >
-              {submitting ? 'Creating account…' : 'Sign Up'} <span aria-hidden>→</span>
-            </button>
-          </form>
+              {GOOGLE_CLIENT_ID ? (
+                <div
+                  ref={googleButtonRef}
+                  style={{ minWidth: 280, minHeight: 44 }}
+                  className="w-full flex justify-center"
+                />
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  title="Set VITE_GOOGLE_CLIENT_ID to enable"
+                  /* CHANGED: h-[50px] -> h-[44px] */
+                  className="w-full h-[44px] flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-[15px] font-medium text-slate-400 cursor-not-allowed"
+                >
+                  Continue with Google
+                </button>
+              )}
 
-          <div className="flex items-center gap-3 my-4">
-            <div className="h-px bg-gray-200 flex-1" />
-            <span className="text-xs text-gray-400">OR</span>
-            <div className="h-px bg-gray-200 flex-1" />
+              {/* CHANGED: mt-6 text-[15px] -> mt-3 text-sm */}
+              <p className="mt-3 text-center text-sm text-slate-500">
+                Already have an account?{' '}
+                <Link to="/login" className="font-semibold text-indigo-600 hover:underline">
+                  Log in
+                </Link>
+              </p>
+            </div>
           </div>
+        </section>
+      </main>
 
-          {GOOGLE_CLIENT_ID ? (
-            <div
-              ref={googleButtonRef}
-              style={{ minWidth: 280 }}
-              className="w-full flex justify-center"
-            />
-          ) : (
-            <button
-              type="button"
-              disabled
-              title="Set VITE_GOOGLE_CLIENT_ID to enable"
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-300 py-2.5 text-sm font-medium text-gray-500 cursor-not-allowed"
-            >
-              Continue with Google
-            </button>
-          )}
-
-          <p className="text-center text-sm text-slate-500 mt-4">
-            Already have an account?{' '}
-            <Link to="/login" className="text-indigo-600 font-medium hover:underline">
-              Login
-            </Link>
-          </p>
+      {/* footer */}
+      <footer className="relative z-10 pb-3 pt-1 flex items-center justify-center lg:justify-start gap-2 text-sm text-slate-500 w-full max-w-[1280px] mx-auto px-6 sm:px-[70px]">
+        <div className="lg:w-[60%] flex items-center justify-center gap-2">
+          <IconShield className="w-4 h-4 text-emerald-500" />
+          Your data stays protected. © {new Date().getFullYear()} AssistEdge
         </div>
-      </div>
-
-      {/* Trust badges */}
-      <div className="max-w-6xl w-full mx-auto px-6 py-2.5 border-t border-indigo-100 flex flex-wrap items-center justify-center gap-x-10 gap-y-1 shrink-0">
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <IconShield className="w-3.5 h-3.5 text-indigo-500" />
-          Secure &amp; Reliable
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <IconBolt className="w-3.5 h-3.5 text-indigo-500" />
-          AI-Powered
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <IconLockCheck className="w-3.5 h-3.5 text-indigo-500" />
-          Your Data, Our Priority
-        </div>
-      </div>
+      </footer>
     </div>
   );
 }

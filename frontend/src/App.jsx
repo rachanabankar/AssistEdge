@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Routes, Route } from "react-router-dom";
+import PublicRoute from "./components/auth/PublicRoute";
+import LandingPage from "./pages/LandingPage";
 import LandingDashboard from "./pages/LandingDashboard";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import CoachingConsole from "./pages/CoachingConsole";
@@ -41,13 +43,18 @@ function Dashboard() {
 
 function App() {
   return (
-     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      {/* CHANGED: removed the unwrapped duplicate /login, /signup, /forgot-password
+          and /reset-password routes that sat above these and matched first,
+          so PublicRoute never ran. Also removed the duplicate "/" route. */}
+      <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+      <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+      {/* CHANGED: left unwrapped on purpose so emailed reset links always work */}
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route
-        path="/*"
+        path="/dashboard/*"
         element={
           <ProtectedRoute>
             <Dashboard />

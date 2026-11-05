@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Bell, AlertTriangle, BarChart2, User } from "lucide-react";
 import { notificationApi } from "../../services/api";
 
@@ -8,7 +8,7 @@ const CATEGORY_CONFIG = {
   profile: { icon: User, iconBg: "bg-indigo-50", iconColor: "text-indigo-500" },
 };
 
-const POLL_INTERVAL_MS = 1000; 
+const POLL_INTERVAL_MS = 1000;
 
 function formatRelativeTime(dateString) {
   const hasTz = /Z$|[+-]\d{2}:\d{2}$/.test(dateString);
@@ -33,25 +33,19 @@ export default function NotificationsDropdown({ onViewAll }) {
   const [loading, setLoading] = useState(false);
   const ref = useRef(null);
 
-  const fetchUnreadCount = () => {
+  const fetchUnreadCount = useCallback(() => {
     notificationApi
       .unreadCount()
       .then((res) => setUnreadCount(res.data.count))
       .catch((err) => console.error("Failed to load unread count:", err));
-  };
+  }, []);
 
-  // Initial fetch on mount
+  // Initial fetch and poll for updates so the badge stays current
   useEffect(() => {
     fetchUnreadCount();
-  }, []);
-
-  // Poll for updates so the badge doesn't go stale while the dropdown is closed
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetchUnreadCount();
-    }, POLL_INTERVAL_MS);
+    const intervalId = setInterval(fetchUnreadCount, POLL_INTERVAL_MS);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [fetchUnreadCount]);
 
   useEffect(() => {
     function handleClickOutside(e) {

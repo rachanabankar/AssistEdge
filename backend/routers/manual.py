@@ -1,18 +1,18 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
-from orchestrator import run_coaching_pipeline
-from models.database import get_db
 from models import crud
+from models.database import get_db
 from models.models import Agent
+from orchestrator import run_coaching_pipeline
 from utils.auth import get_current_agent
 
 router = APIRouter(prefix="/manual", tags=["Manual"])
 
 
 class Turn(BaseModel):
-    sender: str      # "customer" or "agent"
+    sender: str
     content: str
 
 
@@ -22,12 +22,14 @@ class ManualMessageRequest(BaseModel):
     conversation_history: list[Turn] = []
 
 
-# ---------- Ownership helper ----------
+class EndSessionRequest(BaseModel):
+    session_id: str
+    final_agent_reply: str | None = None
+
+
 def _check_session_ownership(db: DBSession, session_id: str, current_agent: Agent):
     session = crud.get_session(db, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    if session.agent_id != current_agent.id:
+    if not session or session.agent_id != current_agent.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
 
@@ -65,15 +67,8 @@ def manual_message(
 
     return {
         "message": payload.customer_message,
-        "sentiment": pipeline_result["sentiment"],
-        "knowledge_suggestions": pipeline_result["knowledge_suggestions"],
-        "coaching": pipeline_result["coaching"],
-        "escalation": pipeline_result["escalation"],
+        **pipeline_result,
     }
-
-class EndSessionRequest(BaseModel):
-    session_id: str
-    final_agent_reply: str | None = None
 
 
 @router.post("/end-session")
@@ -92,4 +87,3 @@ def end_session(
             content=payload.final_agent_reply.strip(),
         )
     return {"status": "ended", "session_id": payload.session_id}
-

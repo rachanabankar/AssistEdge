@@ -1,6 +1,18 @@
 import axios from 'axios'
 import { API_BASE_URL, AUTH_TOKEN_KEY, AUTH_AGENT_KEY } from '../config/constants'
 
+const MULTIPART_CONFIG = {
+  headers: { 'Content-Type': 'multipart/form-data' },
+}
+
+const AUTH_BYPASS_ENDPOINTS = [
+  '/auth/login',
+  '/auth/signup',
+  '/auth/google',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+]
+
 // Central axios instance - all backend REST calls go through this.
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -26,12 +38,10 @@ apiClient.interceptors.response.use(
   (error) => {
     console.error('[API Error]', error?.response?.data || error.message)
 
-    const isAuthAttempt =
-      error?.config?.url?.includes('/auth/login') ||
-      error?.config?.url?.includes('/auth/signup') ||
-      error?.config?.url?.includes('/auth/google') ||
-      error?.config?.url?.includes('/auth/forgot-password') ||
-      error?.config?.url?.includes('/auth/reset-password')
+    const requestUrl = error?.config?.url || ''
+    const isAuthAttempt = AUTH_BYPASS_ENDPOINTS.some((endpoint) =>
+      requestUrl.includes(endpoint)
+    )
 
     if (error?.response?.status === 401 && !isAuthAttempt) {
       localStorage.removeItem(AUTH_TOKEN_KEY)
@@ -62,9 +72,7 @@ export const sessionApi = {
   uploadDocs: (sessionId, file) => {
     const formData = new FormData()
     formData.append('file', file)
-    return apiClient.post(`/session/${sessionId}/upload-docs`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return apiClient.post(`/session/${sessionId}/upload-docs`, formData, MULTIPART_CONFIG)
   },
   query: (sessionId, query, k = 3) =>
     apiClient.post(`/session/${sessionId}/query`, { query, k }),
@@ -83,10 +91,10 @@ export const manualApi = {
 
 // Maps to routers/session.py (list, detail, and messages endpoints)
 export const replayApi = {
-  listSessions: () => apiClient.get(`/session/`),
+  listSessions: () => apiClient.get('/session/'),
   getSessionDetail: (sessionId) => apiClient.get(`/session/${sessionId}`),
   getSessionMessages: (sessionId) => apiClient.get(`/session/${sessionId}/messages`),
-};
+}
 
 // Maps to the report endpoints on routers/session.py
 export const reportApi = {
@@ -103,9 +111,7 @@ export const profileApi = {
   uploadAvatar: (file) => {
     const formData = new FormData()
     formData.append('file', file)
-    return apiClient.post('/profile/avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return apiClient.post('/profile/avatar', formData, MULTIPART_CONFIG)
   },
   changePassword: (currentPassword, newPassword) =>
     apiClient.patch('/profile/password', {
@@ -124,9 +130,7 @@ export const supportApi = {
     if (screenshot) {
       formData.append('screenshot', screenshot)
     }
-    return apiClient.post('/support/tickets', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return apiClient.post('/support/tickets', formData, MULTIPART_CONFIG)
   },
 }
 

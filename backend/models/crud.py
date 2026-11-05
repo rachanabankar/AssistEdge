@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+import hashlib
 import uuid
 from models import models
 from models.models import Session, Message, Report
@@ -152,7 +153,7 @@ def link_google_account(db: Session, agent: models.Agent, google_id: str):
 # ---------- FORGOT / RESET PASSWORD ----------
 
 def set_reset_token(db: Session, agent: models.Agent, token: str, expiry):
-    agent.reset_token = token
+    agent.reset_token = hashlib.sha256(token.encode()).hexdigest()
     agent.reset_token_expiry = expiry
     db.commit()
     db.refresh(agent)

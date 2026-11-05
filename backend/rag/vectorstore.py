@@ -6,10 +6,11 @@ _embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM
 vectorstore = Chroma(
     collection_name="kb_chunks",
     embedding_function=_embeddings,
-    persist_directory="./chroma_db"
+    persist_directory="./chroma_db",
 )
 
 RELEVANCE_THRESHOLD = 0.5  # 0 = unrelated, 1 = perfect match
+
 
 def store_chunks(chunks, session_id: str):
     """
@@ -32,7 +33,7 @@ def retrieve(query: str, session_id: str, k: int = 3):
     results = vectorstore.similarity_search_with_relevance_scores(
         query,
         k=k,
-        filter={"session_id": session_id}
+        filter={"session_id": session_id},
     )
 
     return [

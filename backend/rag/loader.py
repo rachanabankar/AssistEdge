@@ -7,10 +7,7 @@ def load_document(filepath: str):
     Supports PDF and plain text files.
     """
     if filepath.endswith(".pdf"):
-        loader = PyPDFLoader(filepath)
-    elif filepath.endswith(".txt"):
-        loader = TextLoader(filepath, encoding="utf-8")
-    else:
-        raise ValueError(f"Unsupported file type: {filepath}")
-
-    return loader.load()
+        return PyPDFLoader(filepath).load()
+    if filepath.endswith(".txt"):
+        return TextLoader(filepath, encoding="utf-8").load()
+    raise ValueError(f"Unsupported file type: {filepath}")

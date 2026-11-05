@@ -1,19 +1,23 @@
-from fastapi import APIRouter, HTTPException, Depends
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
 from agents.simulator import generate_customer_message
-from orchestrator import run_coaching_pipeline
-from models.database import get_db
 from models import crud
+from models.database import get_db
 from models.models import Agent
+from orchestrator import run_coaching_pipeline
 from utils.auth import get_current_agent
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/simulate", tags=["Simulate"])
 
 
 class Turn(BaseModel):
-    sender: str      # "customer" or "agent"
+    sender: str
     content: str
 
 
@@ -26,7 +30,7 @@ class SimulateMessageRequest(BaseModel):
     scenario: str
     persona: Persona = Persona()
     conversation_history: list[Turn] = []
-    session_id: str | None = None   # NEW — enables persistence, sentiment, KB
+    session_id: str | None = None
 
 
 @router.post("/message")
@@ -39,9 +43,7 @@ def simulate_message(
     # so only check ownership when one was actually provided.
     if payload.session_id:
         session = crud.get_session(db, payload.session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-        if session.agent_id != current_agent.id:
+        if not session or session.agent_id != current_agent.id:
             raise HTTPException(status_code=404, detail="Session not found")
 
     history = [turn.model_dump() for turn in payload.conversation_history]
@@ -64,10 +66,10 @@ def simulate_message(
             conversation_history=history,
         )
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Simulator call failed: {str(e)}")
+        logger.exception("Simulator call failed: %s", e)
+        raise HTTPException(status_code=502, detail="Simulator call failed.")
 
     updated_history = history + [{"sender": "customer", "content": message}]
-
     response = {"message": message}
 
     if payload.session_id:
@@ -77,12 +79,6 @@ def simulate_message(
             sender="customer",
             content=message,
         )
-
-        pipeline_result = run_coaching_pipeline(db, payload.session_id, updated_history)
-        response["sentiment"] = pipeline_result["sentiment"]
-        response["knowledge_suggestions"] = pipeline_result["knowledge_suggestions"]
-        response["coaching"] = pipeline_result["coaching"]
-        response["escalation"] = pipeline_result["escalation"]
-        
+        response.update(run_coaching_pipeline(db, payload.session_id, updated_history))
 
     return response

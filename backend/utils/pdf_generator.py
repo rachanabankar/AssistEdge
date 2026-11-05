@@ -1,22 +1,28 @@
-import os
 import json
+import os
 from io import BytesIO
- 
-from xhtml2pdf import pisa
 from jinja2 import Environment, FileSystemLoader
- 
-# Assumes utils/ and templates/ are siblings at the project root — adjust if your
-# layout differs.
+from xhtml2pdf import pisa
+
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
- 
- 
+
+
+def _safe_json_loads(data: str | None, default=None):
+    if not data:
+        return default
+    try:
+        return json.loads(data)
+    except (json.JSONDecodeError, TypeError):
+        return default
+
+
 def render_report_pdf(session, report, messages) -> bytes:
     template = env.get_template("report.html")
- 
-    sentiment_journey = json.loads(report.sentiment_journey) if report.sentiment_journey else []
-    coaching_tips = json.loads(report.coaching_tips) if report.coaching_tips else []
- 
+
+    sentiment_journey = _safe_json_loads(report.sentiment_journey, default=[])
+    coaching_tips = _safe_json_loads(report.coaching_tips, default=[])
+
     transcript = []
     customer_turn_number = 0
     for m in messages:
@@ -29,14 +35,16 @@ def render_report_pdf(session, report, messages) -> bytes:
             customer_turn_number += 1
             entry["turn"] = customer_turn_number
             entry["frustration_score"] = m.frustration_score
-            entry["sentiment"] = json.loads(m.sentiment_json) if m.sentiment_json else None
-            entry["escalation"] = json.loads(m.escalation_json) if m.escalation_json else None
+            entry["sentiment"] = _safe_json_loads(m.sentiment_json)
+            entry["escalation"] = _safe_json_loads(m.escalation_json)
         transcript.append(entry)
- 
-    duration_seconds = 0
-    if len(messages) >= 2:
-        duration_seconds = int((messages[-1].timestamp - messages[0].timestamp).total_seconds())
- 
+
+    duration_seconds = (
+        int((messages[-1].timestamp - messages[0].timestamp).total_seconds())
+        if len(messages) >= 2
+        else 0
+    )
+
     html_content = template.render(
         session=session,
         report=report,
@@ -45,11 +53,10 @@ def render_report_pdf(session, report, messages) -> bytes:
         transcript=transcript,
         duration_seconds=duration_seconds,
     )
- 
+
     output = BytesIO()
     pisa_status = pisa.CreatePDF(src=html_content, dest=output)
     if pisa_status.err:
         raise RuntimeError(f"PDF generation failed with {pisa_status.err} error(s)")
- 
+
     return output.getvalue()
- 

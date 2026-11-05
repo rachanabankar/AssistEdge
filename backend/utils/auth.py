@@ -14,6 +14,17 @@ from models import crud
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
+
+# Validate the JWT secret at import time so the app refuses to start with an
+# insecure configuration. Any caller that imports this module (including main.py)
+# will get a RuntimeError before the ASGI server accepts any requests.
+_PLACEHOLDER_KEYS = {"your-secret-key", "default", "changeme", "secret", "secretkey"}
+if not SECRET_KEY or len(SECRET_KEY) < 32 or SECRET_KEY.lower() in _PLACEHOLDER_KEYS:
+    raise RuntimeError(
+        "SECRET_KEY is missing, too short (< 32 chars), or uses a placeholder value. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 

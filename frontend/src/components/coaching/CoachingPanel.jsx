@@ -1,20 +1,19 @@
 import { useState } from "react";
 import Card from "../common/Card";
-import Badge from "../common/Badge";
 
 // Each suggested response gets a light tint + accent color, keyed by its
 // tone label. Falls back to a rotating palette for unrecognized tones so
 // boxes never all render the same flat white.
 const TONE_STYLES = {
-  empathetic: { bg: "#ecfdf5", border: "#bdf0d8", accent: "#059669", badge: "green" },
-  "firm and policy-based": { bg: "#eef2ff", border: "#dbe1ff", accent: "#4f46e5", badge: "purple" },
-  "concise and solution-focused": { bg: "#ecfeff", border: "#bdeefc", accent: "#0891b2", badge: "cyan" },
+  empathetic: { bg: "#ecfdf5", border: "#bdf0d8", accent: "#059669" },
+  "firm and policy-based": { bg: "#eef2ff", border: "#dbe1ff", accent: "#4f46e5" },
+  "concise and solution-focused": { bg: "#ecfeff", border: "#bdeefc", accent: "#0891b2" },
 };
 
 const FALLBACK_PALETTE = [
-  { bg: "#fff7ed", border: "#fde3c4", accent: "#ea580c", badge: "orange" },
-  { bg: "#fdf2f8", border: "#fbcfe8", accent: "#db2777", badge: "pink" },
-  { bg: "#f5f3ff", border: "#ddd6fe", accent: "#7c3aed", badge: "purple" },
+  { bg: "#fff7ed", border: "#fde3c4", accent: "#ea580c" },
+  { bg: "#fdf2f8", border: "#fbcfe8", accent: "#db2777" },
+  { bg: "#f5f3ff", border: "#ddd6fe", accent: "#7c3aed" },
 ];
 
 function toneStyleFor(tone, index) {

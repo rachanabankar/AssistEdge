@@ -1,36 +1,59 @@
-@"
-# Backend environment variables
+# Environment variables
+.env
+.env.*
+.env.local
+.env.*.local
 backend/.env
 backend/.env.*
+backend/.env.local
+backend/.env.*.local
+frontend/.env
+frontend/.env.*
+frontend/.env.local
+frontend/.env.*.local
+
+# Never ignore example environment files
+!.env.example
+!**/.env.example
+!backend/.env.example
+!frontend/.env.example
+
 # Backend virtual environment
 backend/venv/
 backend/.venv/
+
 # Backend dependencies
 backend/node_modules/
+
 # Python cache
 backend/__pycache__/
 backend/**/*.pyc
+**/__pycache__/
+*.pyc
+
 # Local databases and generated vector database
 *.db
 *.db.bak
 *.sqlite
 *.sqlite3
 backend/chroma_db/
+
 # Backend runtime/generated data
 backend/uploaded_docs/
+uploads/
+
 # User-uploaded files
 backend/static/avatars/*
 !backend/static/avatars/.gitkeep
 backend/static/support_screenshots/*
 !backend/static/support_screenshots/.gitkeep
-# Frontend dependencies
+
+# Frontend dependencies and build output
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
 frontend/.vite/
-# Frontend environment variables
-frontend/.env
-frontend/.env.*
+
 # Editor / OS junk
 .vscode/*
 !.vscode/extensions.json
@@ -42,6 +65,7 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
 # Logs
 *.log
 npm-debug.log*
@@ -49,4 +73,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-"@ | Set-Content -Encoding UTF8 .gitignore
+
+/chroma_db/
+/uploaded_docs/

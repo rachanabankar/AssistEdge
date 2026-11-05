@@ -1,13 +1,10 @@
-import json
+﻿import json
 
 from sqlalchemy.orm import Session as DBSession
 
-from prompts.summary_prompt import SUMMARY_SYSTEM_PROMPT
-from utils.openrouter_client import call_openrouter
-
-# NOTE: adjust this import to wherever Session/Message/Report actually live in your project
-# (they were shown to me together, so I'm assuming one models module — split as needed).
 from models.models import Session, Message, Report
+from prompts.summary_prompt import SUMMARY_SYSTEM_PROMPT
+from utils.groq_client import call_groq
 
 
 def build_summary_input(db: DBSession, session_id: str) -> dict:
@@ -79,16 +76,47 @@ def _build_user_prompt(input_data: dict) -> str:
     return "\n".join(lines)
 
 
-def _parse_summary_response(raw_content: str) -> dict:
+def _get_fallback_report(fallback_sentiment_journey: list = None) -> dict:
+    is_nullable = True
+    try:
+        is_nullable = bool(Report.resolution_score.property.columns[0].nullable)
+    except Exception:
+        pass
+    return {
+        "summary": "Automated summary could not be generated for this session.",
+        "resolution_score": None if is_nullable else 0,
+        "sentiment_journey": fallback_sentiment_journey if fallback_sentiment_journey is not None else [],
+        "coaching_tips": ["Review this session manually."],
+    }
+
+
+def _extract_sentiment_journey_from_input(input_data: dict) -> list:
+    journey = []
+    if not input_data or "turns" not in input_data:
+        return journey
+    for turn in input_data.get("turns", []):
+        if turn.get("sender") == "customer":
+            sentiment = turn.get("sentiment") or {}
+            journey.append({
+                "turn": turn.get("turn", len(journey) + 1),
+                "sentiment": sentiment.get("emotional_state") or "unknown",
+                "frustration_score": turn.get("frustration_score"),
+            })
+    return journey
+
+
+def _parse_summary_response(raw_content: str, fallback_sentiment_journey: list = None) -> dict:
     """
-    Same defensive parsing pattern as sentiment_agent: strip markdown fences, validate
-    required keys, fall back to a safe default rather than crashing the request.
+    Defensive parsing pattern: strip markdown fences, validate
+    required keys, fall back to a safe default schema rather than crashing.
     """
-    cleaned = raw_content.strip()
+    cleaned = (raw_content or "").strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.strip("`")
         if cleaned.lower().startswith("json"):
             cleaned = cleaned[4:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
     cleaned = cleaned.strip()
 
     try:
@@ -97,17 +125,18 @@ def _parse_summary_response(raw_content: str) -> dict:
         if not required_keys.issubset(parsed.keys()):
             raise ValueError("Missing expected keys in model response")
         return parsed
-    except (json.JSONDecodeError, ValueError) as e:
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
         print(f"Summary agent: failed to parse model output ({e}). Raw: {raw_content}")
-        raise
+        return _get_fallback_report(fallback_sentiment_journey)
 
 
 def generate_report(db: DBSession, session_id: str) -> Report:
     """
     Runs the Summary Agent for a session and upserts the Report row (one report per
-    session — regeneration overwrites in place).
+    session â€” regeneration overwrites in place).
     """
     input_data = build_summary_input(db, session_id)
+    fallback_sentiment_journey = _extract_sentiment_journey_from_input(input_data)
     user_prompt = _build_user_prompt(input_data)
 
     messages = [
@@ -115,60 +144,30 @@ def generate_report(db: DBSession, session_id: str) -> Report:
         {"role": "user", "content": user_prompt},
     ]
 
-    raw_content = call_openrouter(messages, require_json=True)
-
     try:
-        parsed = _parse_summary_response(raw_content)
-    except (json.JSONDecodeError, ValueError):
-        # one retry before giving up, since this is a bigger/pricier call than sentiment
-        raw_content = call_openrouter(messages, require_json=True)
-        parsed = _parse_summary_response(raw_content)  # let it raise if it fails again
+        raw_content = call_groq(messages, require_json=True)
+    except Exception as e:
+        print(f"Summary agent: call_groq failed ({e}), using fallback report.")
+        raw_content = ""
+
+    parsed = _parse_summary_response(raw_content, fallback_sentiment_journey=fallback_sentiment_journey)
+
+    report_fields = {
+        "summary": parsed["summary"],
+        "resolution_score": parsed["resolution_score"],
+        "sentiment_journey": json.dumps(parsed["sentiment_journey"]),
+        "coaching_tips": json.dumps(parsed["coaching_tips"]),
+    }
 
     existing = db.query(Report).filter(Report.session_id == session_id).first()
     if existing:
-        existing.summary = parsed["summary"]
-        existing.resolution_score = parsed["resolution_score"]
-        existing.sentiment_journey = json.dumps(parsed["sentiment_journey"])
-        existing.coaching_tips = json.dumps(parsed["coaching_tips"])
+        for key, value in report_fields.items():
+            setattr(existing, key, value)
         report = existing
     else:
-        report = Report(
-            session_id=session_id,
-            summary=parsed["summary"],
-            resolution_score=parsed["resolution_score"],
-            sentiment_journey=json.dumps(parsed["sentiment_journey"]),
-            coaching_tips=json.dumps(parsed["coaching_tips"]),
-        )
+        report = Report(session_id=session_id, **report_fields)
         db.add(report)
 
     db.commit()
     db.refresh(report)
     return report
-
-
-if __name__ == "__main__":
-    # Quick manual test: python -m agents.summary_agent <session_id>
-    import sys
-    from models.database import SessionLocal
-
-    if len(sys.argv) < 2:
-        print("Usage: python -m agents.summary_agent <session_id>")
-        sys.exit(1)
-
-    db = SessionLocal()
-    try:
-        result = generate_report(db, sys.argv[1])
-        print(
-            json.dumps(
-                {
-                    "session_id": result.session_id,
-                    "summary": result.summary,
-                    "resolution_score": result.resolution_score,
-                    "sentiment_journey": json.loads(result.sentiment_journey),
-                    "coaching_tips": json.loads(result.coaching_tips),
-                },
-                indent=2,
-            )
-        )
-    finally:
-        db.close()
