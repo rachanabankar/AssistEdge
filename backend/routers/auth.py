@@ -14,6 +14,9 @@ from utils.email import send_password_reset_email
 from models.database import get_db
 from models import crud
 
+
+from ratelimit import rate_limit
+
 from utils.auth import (
     hash_password,
     verify_password,
@@ -21,8 +24,9 @@ from utils.auth import (
     generate_reset_token,
 )
 
-# Dummy hash for timing-attack mitigation; computed once at import time
-DUMMY_HASH = hash_password("dummy-password")
+# Dummy hash for timing-attack mitigation; computed once at import time,
+# with the same hashing function as real passwords so the cost matches.
+DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +34,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
-APP_ENV = os.getenv("APP_ENV", "development")
+from config import APP_ENV
 _raw_frontend_url = os.getenv("FRONTEND_BASE_URL")
 if _raw_frontend_url is not None:
     _raw_frontend_url = _raw_frontend_url.strip().rstrip("/")
@@ -99,7 +103,7 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 # ---------- POST /auth/signup ----------
-@router.post("/signup")
+@router.post("/signup", dependencies=[Depends(rate_limit("5/min", "signup"))])
 def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     existing = crud.get_agent_by_username(db, payload.username)
     if existing:
@@ -117,7 +121,7 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
 
 
 # ---------- POST /auth/login ----------
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(rate_limit("10/min", "login"))])
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     agent = crud.get_agent_by_username(db, payload.username)
     if not agent:
@@ -136,7 +140,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 
 # ---------- POST /auth/google ----------
-@router.post("/google")
+@router.post("/google", dependencies=[Depends(rate_limit("10/min", "google"))])
 def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     if not GOOGLE_CLIENT_ID:
         raise HTTPException(
@@ -198,7 +202,7 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
 
 
 # ---------- POST /auth/forgot-password ----------
-@router.post("/forgot-password")
+@router.post("/forgot-password", dependencies=[Depends(rate_limit("5/min", "forgot-password"))])
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     agent = crud.get_agent_by_username(db, payload.identifier) or crud.get_agent_by_email(
         db, payload.identifier
@@ -221,7 +225,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     email_sent = send_password_reset_email(agent.email, reset_link)
 
     if not email_sent:
-        if os.getenv("APP_ENV") == "development":
+        if APP_ENV == "development":
             print(f"\n[PASSWORD RESET] {agent.username} -> {reset_link}\n")
             return {
                 "message": "If an account with that username or email exists, a reset link has been sent.",
@@ -232,7 +236,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     return generic_response
 
 # ---------- POST /auth/reset-password ----------
-@router.post("/reset-password")
+@router.post("/reset-password", dependencies=[Depends(rate_limit("5/min", "reset-password"))])
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
     token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
     agent = crud.get_agent_by_reset_token(db, token_hash)
