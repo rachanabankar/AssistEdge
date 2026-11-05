@@ -26,7 +26,7 @@ if not SECRET_KEY or len(SECRET_KEY) < 32 or SECRET_KEY.lower() in _PLACEHOLDER_
     )
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 60 minutes (1 hour)
 
 # Points at the login endpoint so FastAPI's auto-docs know how to get a token.
 # tokenUrl is relative to the app root, matching how routers.auth will be registered.
@@ -57,7 +57,12 @@ def create_access_token(agent_id: int, username: str) -> str:
 
 def decode_access_token(token: str) -> dict:
     """Raises jwt.PyJWTError (expired, invalid signature, malformed, etc.) on failure."""
-    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    return jwt.decode(
+        token,
+        SECRET_KEY,
+        algorithms=[ALGORITHM],
+        options={"require": ["exp", "sub"]},
+    )
 
 
 # ---------- Password reset tokens ----------
@@ -86,13 +91,17 @@ def get_current_agent(
 
     try:
         payload = decode_access_token(token)
-        agent_id = payload.get("sub")
-        if agent_id is None:
+        agent_id_raw = payload.get("sub")
+        if agent_id_raw is None:
+            raise credentials_exception
+        try:
+            agent_id = int(agent_id_raw)
+        except (ValueError, TypeError):
             raise credentials_exception
     except jwt.PyJWTError:
         raise credentials_exception
 
-    agent = crud.get_agent_by_id(db, int(agent_id))
+    agent = crud.get_agent_by_id(db, agent_id)
     if agent is None:
         raise credentials_exception
 

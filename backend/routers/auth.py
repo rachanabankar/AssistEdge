@@ -6,19 +6,23 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 from utils.email import send_password_reset_email
 
 from models.database import get_db
 from models import crud
+
 from utils.auth import (
     hash_password,
     verify_password,
     create_access_token,
     generate_reset_token,
 )
+
+# Dummy hash for timing-attack mitigation; computed once at import time
+DUMMY_HASH = hash_password("dummy-password")
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +52,28 @@ class SignupRequest(BaseModel):
     username: str
     password: str
 
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        # Ensure password is at least 8 characters
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        # Ensure password is no more than 72 UTF-8 bytes
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password must be at most 72 UTF-8 bytes')
+        return v
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        # Ensure password is no more than 72 UTF-8 bytes
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password must be at most 72 UTF-8 bytes')
+        return v
 
 class GoogleLoginRequest(BaseModel):
     id_token: str  # the credential JWT returned by Google Identity Services on the frontend
@@ -66,6 +87,16 @@ class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
 
+    @field_validator('new_password')
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        # Ensure password is at least 8 characters
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        # Ensure password is no more than 72 UTF-8 bytes
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password must be at most 72 UTF-8 bytes')
+        return v
 
 # ---------- POST /auth/signup ----------
 @router.post("/signup")
@@ -89,7 +120,11 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     agent = crud.get_agent_by_username(db, payload.username)
-    if not agent or not verify_password(payload.password, agent.password_hash):
+    if not agent:
+        # Timing attack mitigation: run password verification against a dummy hash
+        verify_password(payload.password, DUMMY_HASH)
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    if not verify_password(payload.password, agent.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     token = create_access_token(agent_id=agent.id, username=agent.username)
@@ -114,7 +149,13 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
             payload.id_token, google_requests.Request(), GOOGLE_CLIENT_ID
         )
     except ValueError:
+        # Fixed message on purpose: never return exception text to the client.
         raise HTTPException(status_code=401, detail="Invalid Google token")
+
+    # Reject unless the claim is the boolean True (a string "true" or a
+    # missing claim is rejected).
+    if idinfo.get("email_verified") is not True:
+        raise HTTPException(status_code=401, detail="Google email not verified")
 
     google_id = idinfo["sub"]
     email = idinfo.get("email")
@@ -123,11 +164,16 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     # 1. Already linked to this Google account -> just log them in.
     agent = crud.get_agent_by_google_id(db, google_id)
 
-    # 2. Not linked yet, but an existing account shares this email -> link it.
+    # 2. Not linked, but an existing account shares this email -> do NOT
+    #    auto-link (account-takeover risk). The user must log in with their
+    #    password instead.
     if not agent and email:
-        agent = crud.get_agent_by_email(db, email)
-        if agent:
-            agent = crud.link_google_account(db, agent, google_id)
+        existing = crud.get_agent_by_email(db, email)
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail="An account with this email already exists. Please log in with your username and password.",
+            )
 
     # 3. Brand new agent -> create one. password_hash is required by the
     #    schema, so we set it to a random, unusable value the agent will
