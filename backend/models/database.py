@@ -10,7 +10,7 @@ if DATABASE_URL.startswith("postgres://"):
 _engine_options = (
     {"connect_args": {"check_same_thread": False}}
     if DATABASE_URL.startswith("sqlite")
-    else {"pool_pre_ping": True, "pool_recycle": 300}
+    else {"pool_pre_ping": True}
 )
 engine = create_engine(DATABASE_URL, **_engine_options)
 
