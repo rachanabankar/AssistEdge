@@ -1,13 +1,20 @@
+from pathlib import Path
+
 from dotenv import load_dotenv
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_ENV_FILE = Path(__file__).resolve().parent / ".env"
+
 # Preserve environment loading for callers that still read os.environ directly.
-load_dotenv()
+load_dotenv(_ENV_FILE)
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_ENV_FILE, extra="ignore",
+        hide_input_in_errors=True, case_sensitive=True,
+    )
 
     APP_ENV: str = Field(default="development", validation_alias=AliasChoices("ENV", "APP_ENV"))
     DATABASE_URL: str = "sqlite:///./assistedge.db"
@@ -51,6 +58,10 @@ class Settings(BaseSettings):
                 "characters, and must not be blank or a placeholder."
             )
         return value
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     @property
     def cors_origins(self) -> list[str]:
