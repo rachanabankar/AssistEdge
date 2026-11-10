@@ -50,3 +50,30 @@ def rate_limit(spec: str, scope: str):
             dq.append(now)
 
     return dependency
+
+
+def agent_rate_limit_check(agent_id, spec, scope):
+    # Per-account limit. Call after authentication.
+    if not RATE_LIMIT_ENABLED:
+        return
+    count_s, per = spec.split("/")
+    max_requests = int(count_s)
+    period = _PERIODS[per]
+    now = time.monotonic()
+    key = (scope, "agent:" + str(agent_id))
+    with _lock:
+        entry = _hits.get(key)
+        if entry is None:
+            entry = (period, deque())
+            _hits[key] = entry
+        dq = entry[1]
+        while dq and now - dq[0] >= period:
+            dq.popleft()
+        if len(dq) >= max_requests:
+            retry = int(period - (now - dq[0])) + 1
+            raise HTTPException(
+                status_code=429,
+                detail="Too many requests",
+                headers={"Retry-After": str(retry)},
+            )
+        dq.append(now)

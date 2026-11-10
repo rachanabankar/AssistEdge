@@ -1,23 +1,24 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 import os, uuid
+from utils.uploads import safe_ext, read_bounded, require_image
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 
 from models.database import get_db
 from models import crud
-from utils.auth import get_current_agent, verify_password, hash_password
+from utils.auth import get_current_agent, verify_password, hash_password, create_access_token
+from ratelimit import agent_rate_limit_check
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 
 AVATAR_DIR = "static/avatars"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_SIZE_BYTES = 2 * 1024 * 1024  # 2MB, matches the UI copy ("Maximum 2MB")
-
+PROFILE_EDITABLE_FIELDS = {"name", "phone", "department", "time_zone", "language"}
 
 class ProfileUpdateRequest(BaseModel):
     name: Optional[str] = None
-    email: Optional[str] = None
     phone: Optional[str] = None
     department: Optional[str] = None
     time_zone: Optional[str] = None
@@ -51,7 +52,12 @@ def update_profile(
     db: Session = Depends(get_db),
     current_agent=Depends(get_current_agent),
 ):
-    updated = crud.update_agent_profile(db, current_agent, **payload.dict())
+    changes = {
+        k: v
+        for k, v in payload.model_dump(exclude_unset=True).items()
+        if k in PROFILE_EDITABLE_FIELDS
+    }
+    updated = crud.update_agent_profile(db, current_agent, **changes)
 
     if updated.notify_profile_updated:
         crud.create_notification(
@@ -71,13 +77,9 @@ async def upload_avatar(
     db: Session = Depends(get_db),
     current_agent=Depends(get_current_agent),
 ):
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
-
-    contents = await file.read()
-    if len(contents) > MAX_SIZE_BYTES:
-        raise HTTPException(status_code=400, detail="File too large (max 2MB)")
+    ext = safe_ext(file.filename, ALLOWED_EXTENSIONS)
+    contents = await read_bounded(file, MAX_SIZE_BYTES)
+    require_image(ext, contents)
 
     filename = f"{current_agent.id}_{uuid.uuid4().hex}{ext}"
     filepath = os.path.join(AVATAR_DIR, filename)
@@ -94,6 +96,22 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
+    @field_validator("current_password")
+    @classmethod
+    def validate_current_password(cls, v: str) -> str:
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 UTF-8 bytes")
+        return v
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 UTF-8 bytes")
+        return v
+
 
 @router.patch("/password")
 def change_password(
@@ -101,10 +119,13 @@ def change_password(
     agent=Depends(get_current_agent),
     db: Session = Depends(get_db),
 ):
+    agent_rate_limit_check(agent.id, "5/min", "change-password")
     if not verify_password(payload.current_password, agent.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if payload.new_password == payload.current_password:
+        raise HTTPException(status_code=400, detail="New password must be different from the current password")
     new_hash = hash_password(payload.new_password)
-    crud.change_agent_password(db, agent, new_hash)
+    crud.change_password_and_revoke(db, agent, new_hash)
 
     if agent.notify_password_changed:
         crud.create_notification(
@@ -115,4 +136,5 @@ def change_password(
             message="Your password has been changed successfully.",
         )
 
-    return {"detail": "Password updated successfully"}
+    token = create_access_token(agent_id=agent.id, username=agent.username, token_version=agent.token_version)
+    return {"detail": "Password updated successfully", "access_token": token, "token_type": "bearer"}

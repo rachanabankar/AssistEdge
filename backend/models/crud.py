@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import hashlib
 import uuid
+from datetime import datetime, timezone
 from models import models
 from models.models import Session, Message, Report
 
@@ -132,8 +134,18 @@ def get_agent_by_id(db: Session, agent_id: int):
     return db.query(models.Agent).filter(models.Agent.id == agent_id).first()
 
 
+def _norm_email(email):
+    if email is None:
+        return None
+    email = email.strip().lower()
+    return email or None
+
+
 def get_agent_by_email(db: Session, email: str):
-    return db.query(models.Agent).filter(models.Agent.email == email).first()
+    e = _norm_email(email)
+    if not e:
+        return None
+    return db.query(models.Agent).filter(func.lower(models.Agent.email) == e).first()
 
 
 # ---------- GOOGLE LOGIN ----------
@@ -171,12 +183,33 @@ def clear_reset_token(db: Session, agent: models.Agent):
     db.refresh(agent)
     return agent
 
+def reset_password_and_revoke(db: Session, token_hash: str, new_password_hash: str):
+    """Atomically consume an unexpired token, change password and revoke JWTs."""
+    updated = db.query(models.Agent).filter(
+        models.Agent.reset_token == token_hash,
+        models.Agent.reset_token.isnot(None),
+        models.Agent.reset_token_expiry > datetime.now(timezone.utc),
+    ).update({
+        models.Agent.password_hash: new_password_hash,
+        models.Agent.reset_token: None,
+        models.Agent.reset_token_expiry: None,
+        models.Agent.token_version: func.coalesce(models.Agent.token_version, 0) + 1,
+    }, synchronize_session=False)
+    if updated != 1:
+        db.rollback()
+        return False
+    db.commit()
+    db.expire_all()
+    return True
 
 def update_agent_profile(db: Session, agent: models.Agent, **fields):
     """
     Updates only the fields passed in (skips None values, so a partial
     PATCH payload doesn't wipe out fields the agent didn't touch).
+    Email is normalized to lowercase.
     """
+    if fields.get("email") is not None:
+        fields["email"] = _norm_email(fields["email"])
     for key, value in fields.items():
         if value is not None:
             setattr(agent, key, value)
@@ -192,6 +225,14 @@ def update_agent_avatar(db: Session, agent: models.Agent, avatar_url: str):
 
 def change_agent_password(db: Session, agent: models.Agent, new_password_hash: str):
     agent.password_hash = new_password_hash
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+def change_password_and_revoke(db: Session, agent: models.Agent, new_password_hash: str):
+    # One commit: new password and old JWTs revoked.
+    agent.password_hash = new_password_hash
+    agent.token_version = (agent.token_version or 0) + 1
     db.commit()
     db.refresh(agent)
     return agent

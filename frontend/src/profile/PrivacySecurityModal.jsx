@@ -1,8 +1,10 @@
 import { X, Lock, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
 import { profileApi } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function PrivacySecurityModal({ isOpen, onClose }) {
+  const { updateToken } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -32,6 +34,11 @@ export default function PrivacySecurityModal({ isOpen, onClose }) {
       setError("New password must be at least 8 characters");
       return;
     }
+    const enc = new TextEncoder();
+    if (enc.encode(newPassword).length > 72 || enc.encode(currentPassword).length > 72) {
+      setError("Passwords must be at most 72 bytes");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setError("New passwords do not match");
       return;
@@ -39,13 +46,15 @@ export default function PrivacySecurityModal({ isOpen, onClose }) {
 
     setLoading(true);
     try {
-      await profileApi.changePassword(currentPassword, newPassword);
+      const res = await profileApi.changePassword(currentPassword, newPassword);
+      if (res.data && res.data.access_token) updateToken(res.data.access_token);
       setSuccess(true);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to change password");
+      const d = err.response?.data?.detail;
+      setError(typeof d === "string" ? d : "Failed to change password");
     } finally {
       setLoading(false);
     }

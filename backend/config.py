@@ -12,5 +12,7 @@ if APP_ENV not in {"development", "production"}:
     raise RuntimeError("APP_ENV must be 'development' or 'production'")
 
 # Rate limiting toggle - enabled by default; can be disabled in dev
-RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() != "false"
+RATE_LIMIT_ENABLED = APP_ENV == "production" or (
+    os.getenv("RATE_LIMIT_ENABLED", "true").strip().lower() != "false"
+)
 

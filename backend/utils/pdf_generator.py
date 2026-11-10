@@ -1,11 +1,14 @@
 import json
 import os
 from io import BytesIO
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from xhtml2pdf import pisa
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
-env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+env = Environment(
+    loader=FileSystemLoader(TEMPLATE_DIR),
+    autoescape=select_autoescape(["html", "xml"]),
+)
 
 
 def _safe_json_loads(data: str | None, default=None):
@@ -55,8 +58,20 @@ def render_report_pdf(session, report, messages) -> bytes:
     )
 
     output = BytesIO()
-    pisa_status = pisa.CreatePDF(src=html_content, dest=output)
-    if pisa_status.err:
-        raise RuntimeError(f"PDF generation failed with {pisa_status.err} error(s)")
+    resource_blocked = False
+
+    def deny_resource(uri, basepath=None):
+        nonlocal resource_blocked
+        resource_blocked = True
+        raise ValueError("PDF resource loading is disabled")
+
+    try:
+        pisa_status = pisa.CreatePDF(
+            src=html_content, dest=output, link_callback=deny_resource
+        )
+    except Exception:
+        raise RuntimeError("PDF generation failed") from None
+    if resource_blocked or pisa_status.err:
+        raise RuntimeError("PDF generation failed")
 
     return output.getvalue()

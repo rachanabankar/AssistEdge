@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, TIMESTAMP
+from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, ForeignKey, Text, func, Index
 from sqlalchemy.sql import func
 from models.database import Base
 
@@ -34,7 +34,12 @@ class Agent(Base):
     # guards against a stale token being replayed later.
     reset_token = Column(String, nullable=True)
     reset_token_expiry = Column(TIMESTAMP, nullable=True)
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
 
+    __table_args__ = (
+        Index("ix_agents_email_lower", func.lower(email), unique=True,
+              sqlite_where=email.isnot(None)),
+    )
 
 class Session(Base):
     __tablename__ = "sessions"

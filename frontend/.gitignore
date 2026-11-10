@@ -1,6 +1,13 @@
 .env
 .env.*
 !.env.example
+*.db
+chroma/
+chroma_db/
+uploads/
+venv/
+.venv/
+__pycache__/
 node_modules
 dist
 dist-ssr

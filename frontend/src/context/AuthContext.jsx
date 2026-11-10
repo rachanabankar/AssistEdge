@@ -79,6 +79,11 @@ export function AuthProvider({ children }) {
     return data
   }, [persistAuth, loadFullProfile])
 
+  const updateToken = useCallback((newToken) => {
+    localStorage.setItem(AUTH_TOKEN_KEY, newToken)
+    setToken(newToken)
+  }, [])
+
   const logout = useCallback(() => {
     localStorage.removeItem(AUTH_TOKEN_KEY)
     localStorage.removeItem(AUTH_AGENT_KEY)
@@ -96,7 +101,8 @@ export function AuthProvider({ children }) {
     googleLogin,
     logout,
     updateAgent,
-  }), [token, agent, loading, login, signup, googleLogin, logout, updateAgent])
+    updateToken,
+  }), [token, agent, loading, login, signup, googleLogin, logout, updateAgent, updateToken])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -1,30 +1,31 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DBSession
 
 from models import crud
 from models.database import get_db
 from models.models import Agent
 from orchestrator import run_coaching_pipeline
+from ratelimit import agent_rate_limit_check
 from utils.auth import get_current_agent
 
 router = APIRouter(prefix="/manual", tags=["Manual"])
 
 
 class Turn(BaseModel):
-    sender: str
-    content: str
+    sender: str = Field(max_length=20)
+    content: str = Field(max_length=4000)
 
 
 class ManualMessageRequest(BaseModel):
-    session_id: str
-    customer_message: str
-    conversation_history: list[Turn] = []
+    session_id: str = Field(max_length=64)
+    customer_message: str = Field(max_length=4000)
+    conversation_history: list[Turn] = Field(default_factory=list, max_length=200)
 
 
 class EndSessionRequest(BaseModel):
-    session_id: str
-    final_agent_reply: str | None = None
+    session_id: str = Field(max_length=64)
+    final_agent_reply: str | None = Field(None, max_length=4000)
 
 
 def _check_session_ownership(db: DBSession, session_id: str, current_agent: Agent):
@@ -39,6 +40,7 @@ def manual_message(
     db: DBSession = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
+    agent_rate_limit_check(current_agent.id, "20/min", "coach-llm")
     _check_session_ownership(db, payload.session_id, current_agent)
 
     if not payload.customer_message.strip():
@@ -77,6 +79,7 @@ def end_session(
     db: DBSession = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
+    agent_rate_limit_check(current_agent.id, "60/min", "coach-end")
     _check_session_ownership(db, payload.session_id, current_agent)
 
     if payload.final_agent_reply and payload.final_agent_reply.strip():

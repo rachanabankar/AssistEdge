@@ -13,15 +13,24 @@ from models import crud
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = (os.getenv("SECRET_KEY") or "").strip()
 
 # Validate the JWT secret at import time so the app refuses to start with an
 # insecure configuration. Any caller that imports this module (including main.py)
 # will get a RuntimeError before the ASGI server accepts any requests.
-_PLACEHOLDER_KEYS = {"your-secret-key", "default", "changeme", "secret", "secretkey"}
-if not SECRET_KEY or len(SECRET_KEY) < 32 or SECRET_KEY.lower() in _PLACEHOLDER_KEYS:
+_PLACEHOLDER_KEYS = {
+    "your-secret-key", "default", "changeme", "secret", "secretkey",
+    "replace-me", "your_jwt_signing_secret_here",
+}
+if (
+    len(SECRET_KEY) < 32
+    or len(set(SECRET_KEY)) < 8
+    or SECRET_KEY.lower() in _PLACEHOLDER_KEYS
+    or any(marker in SECRET_KEY.lower() for marker in ("example", "dummy"))
+):
     raise RuntimeError(
-        "SECRET_KEY is missing, too short (< 32 chars), or uses a placeholder value. "
+        "SECRET_KEY must contain at least 32 characters and 8 distinct characters, "
+        "and must not be blank or a placeholder. "
         "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
     )
 
@@ -45,11 +54,12 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
 
 # ---------- JWT ----------
 
-def create_access_token(agent_id: int, username: str) -> str:
+def create_access_token(agent_id: int, username: str, token_version: int = 0) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(agent_id),
         "username": username,
+        "tv": int(token_version or 0),
         "exp": expire,
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -103,6 +113,11 @@ def get_current_agent(
 
     agent = crud.get_agent_by_id(db, agent_id)
     if agent is None:
+        raise credentials_exception
+
+    # Tokens issued before a password reset carry an older version and are rejected.
+    # Tokens issued before this feature existed have no "tv" claim and count as 0.
+    if payload.get("tv", 0) != (agent.token_version or 0):
         raise credentials_exception
 
     return agent

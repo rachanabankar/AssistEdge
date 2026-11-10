@@ -244,7 +244,6 @@ def upload_docs(
     return {
         "message": "File uploaded successfully",
         "filename": safe_filename,
-        "saved_to": save_path,
         "chunks_indexed": len(chunks),
     }
 
@@ -332,7 +331,12 @@ def download_session_report_pdf(
         )
 
     messages = crud.get_messages(db, session_id)
-    pdf_bytes = render_report_pdf(session, report, messages)
+    try:
+        pdf_bytes = render_report_pdf(session, report, messages)
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="PDF generation failed"
+        ) from None
 
     return Response(
         content=pdf_bytes,

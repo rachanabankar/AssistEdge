@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DBSession
 
 from agents.simulator import generate_customer_message
@@ -9,6 +9,7 @@ from models import crud
 from models.database import get_db
 from models.models import Agent
 from orchestrator import run_coaching_pipeline
+from ratelimit import agent_rate_limit_check
 from utils.auth import get_current_agent
 
 logger = logging.getLogger(__name__)
@@ -17,20 +18,20 @@ router = APIRouter(prefix="/simulate", tags=["Simulate"])
 
 
 class Turn(BaseModel):
-    sender: str
-    content: str
+    sender: str = Field(max_length=20)
+    content: str = Field(max_length=4000)
 
 
 class Persona(BaseModel):
-    tone: str = "neutral"
-    patience: str = "medium"
+    tone: str = Field("neutral", max_length=50)
+    patience: str = Field("medium", max_length=50)
 
 
 class SimulateMessageRequest(BaseModel):
-    scenario: str
+    scenario: str = Field(max_length=2000)
     persona: Persona = Persona()
-    conversation_history: list[Turn] = []
-    session_id: str | None = None
+    conversation_history: list[Turn] = Field(default_factory=list, max_length=200)
+    session_id: str | None = Field(None, max_length=64)
 
 
 @router.post("/message")
@@ -39,6 +40,8 @@ def simulate_message(
     db: DBSession = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
+    agent_rate_limit_check(current_agent.id, "20/min", "coach-llm")
+
     # session_id is optional here (simulator can run "dry" with no persistence),
     # so only check ownership when one was actually provided.
     if payload.session_id:

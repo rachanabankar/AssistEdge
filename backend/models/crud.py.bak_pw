@@ -1,0 +1,415 @@
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+import hashlib
+import uuid
+from models import models
+from models.models import Session, Message, Report
+
+# ---------- SESSION CRUD ----------
+
+def create_session(db: Session, mode: str, agent_id: int, scenario: str = None, product_context: str = None,
+                    customer_tone: str = None, patience_level: str = None):
+    new_session = models.Session(
+        id=str(uuid.uuid4()),
+        mode=mode,
+        agent_id=agent_id,
+        scenario=scenario,
+        product_context=product_context,
+        customer_tone=customer_tone,
+        patience_level=patience_level,
+    )
+    db.add(new_session)
+    db.commit()
+    db.refresh(new_session)
+    return new_session
+
+
+def get_session(db: Session, session_id: str):
+    return db.query(models.Session).filter(models.Session.id == session_id).first()
+
+def get_all_sessions(db: Session, agent_id: int):
+    return (
+        db.query(models.Session)
+        .filter(models.Session.agent_id == agent_id)
+        .order_by(models.Session.created_at.desc())
+        .all()
+    )
+
+# ---------- MESSAGE CRUD ----------
+
+def add_message(db: Session, session_id: str, sender: str, content: str, frustration_score: int = None):
+    new_message = models.Message(
+        session_id=session_id,
+        sender=sender,
+        content=content,
+        frustration_score=frustration_score,
+    )
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+    return new_message
+
+
+def get_messages(db: Session, session_id: str):
+    return (
+        db.query(models.Message)
+        .filter(models.Message.session_id == session_id)
+        .order_by(models.Message.timestamp.asc())
+        .all()
+    )
+
+
+def get_latest_customer_message(db: Session, session_id: str):
+    """
+    Returns the most recently added customer message row for this session, or None.
+    Used by the orchestrator to attach a frustration_score to the correct row right
+    after sentiment analysis runs.
+    """
+    return (
+        db.query(models.Message)
+        .filter(models.Message.session_id == session_id)
+        .filter(models.Message.sender == "customer")
+        .order_by(models.Message.timestamp.desc(), models.Message.id.desc())
+        .first()
+    )
+
+
+def get_frustration_history(db: Session, session_id: str):
+    """
+    Returns the frustration_score for every customer message in this session,
+    ordered oldest to newest, skipping any turns where the score wasn't recorded
+    (e.g. sentiment_agent failed on that turn). Used by escalation_agent to judge
+    whether frustration is rising, falling, or stable across the conversation.
+    """
+    messages = (
+        db.query(models.Message)
+        .filter(models.Message.session_id == session_id)
+        .filter(models.Message.sender == "customer")
+        .order_by(models.Message.timestamp.asc())
+        .all()
+    )
+    return [m.frustration_score for m in messages if m.frustration_score is not None]
+
+
+# ---------- REPORT CRUD ----------
+
+def create_report(db: Session, session_id: str, summary: str, resolution_score: int,
+                   sentiment_journey: str, coaching_tips: str):
+    new_report = models.Report(
+        session_id=session_id,
+        summary=summary,
+        resolution_score=resolution_score,
+        sentiment_journey=sentiment_journey,
+        coaching_tips=coaching_tips
+    )
+    db.add(new_report)
+    db.commit()
+    db.refresh(new_report)
+    return new_report
+
+
+def get_report(db: Session, session_id: str):
+    """Returns the Report row for a session, or None if no report has been generated yet."""
+    return db.query(Report).filter(Report.session_id == session_id).first()
+
+# ---------- AGENT CRUD ----------
+
+def create_agent(db: Session, username: str, password_hash: str):
+    new_agent = models.Agent(
+        username=username,
+        password_hash=password_hash,
+    )
+    db.add(new_agent)
+    db.commit()
+    db.refresh(new_agent)
+    return new_agent
+
+
+def get_agent_by_username(db: Session, username: str):
+    return db.query(models.Agent).filter(models.Agent.username == username).first()
+
+
+def get_agent_by_id(db: Session, agent_id: int):
+    return db.query(models.Agent).filter(models.Agent.id == agent_id).first()
+
+
+def _norm_email(email):
+    if email is None:
+        return None
+    email = email.strip().lower()
+    return email or None
+
+
+def get_agent_by_email(db: Session, email: str):
+    e = _norm_email(email)
+    if not e:
+        return None
+    return db.query(models.Agent).filter(func.lower(models.Agent.email) == e).first()
+
+
+# ---------- GOOGLE LOGIN ----------
+
+def get_agent_by_google_id(db: Session, google_id: str):
+    return db.query(models.Agent).filter(models.Agent.google_id == google_id).first()
+
+
+def link_google_account(db: Session, agent: models.Agent, google_id: str):
+    """Attaches a Google account to an existing or newly-created agent row."""
+    agent.google_id = google_id
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+
+# ---------- FORGOT / RESET PASSWORD ----------
+
+def set_reset_token(db: Session, agent: models.Agent, token: str, expiry):
+    agent.reset_token = hashlib.sha256(token.encode()).hexdigest()
+    agent.reset_token_expiry = expiry
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+
+def get_agent_by_reset_token(db: Session, token: str):
+    return db.query(models.Agent).filter(models.Agent.reset_token == token).first()
+
+
+def clear_reset_token(db: Session, agent: models.Agent):
+    agent.reset_token = None
+    agent.reset_token_expiry = None
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+def reset_password_and_revoke(db: Session, agent: models.Agent, new_password_hash: str):
+    """One commit: new password, reset token cleared, old JWTs revoked."""
+    agent.password_hash = new_password_hash
+    agent.reset_token = None
+    agent.reset_token_expiry = None
+    agent.token_version = (agent.token_version or 0) + 1
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+def update_agent_profile(db: Session, agent: models.Agent, **fields):
+    """
+    Updates only the fields passed in (skips None values, so a partial
+    PATCH payload doesn't wipe out fields the agent didn't touch).
+    Email is normalized to lowercase.
+    """
+    if fields.get("email") is not None:
+        fields["email"] = _norm_email(fields["email"])
+    for key, value in fields.items():
+        if value is not None:
+            setattr(agent, key, value)
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+def update_agent_avatar(db: Session, agent: models.Agent, avatar_url: str):
+    agent.avatar_url = avatar_url
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+def change_agent_password(db: Session, agent: models.Agent, new_password_hash: str):
+    agent.password_hash = new_password_hash
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+_PREF_FIELD_MAP = {
+    "escalations": "notify_escalations",
+    "sessionReport": "notify_session_report",
+    "profileUpdated": "notify_profile_updated",
+    "passwordChanged": "notify_password_changed",
+}
+
+def get_notification_preferences(agent: models.Agent):
+    return {
+        "escalations": agent.notify_escalations,
+        "sessionReport": agent.notify_session_report,
+        "profileUpdated": agent.notify_profile_updated,
+        "passwordChanged": agent.notify_password_changed,
+    }
+
+def update_notification_preferences(db: Session, agent: models.Agent, **fields):
+    for key, value in fields.items():
+        if value is not None and key in _PREF_FIELD_MAP:
+            setattr(agent, _PREF_FIELD_MAP[key], value)
+    db.commit()
+    db.refresh(agent)
+    return agent
+
+# ---------- SUPPORT TICKET CRUD ----------
+
+def create_support_ticket(db: Session, agent_id: int, issue_type: str, subject: str,
+                           priority: str, screenshot_url: str = None):
+    new_ticket = models.SupportTicket(
+        agent_id=agent_id,
+        issue_type=issue_type,
+        subject=subject,
+        priority=priority,
+        screenshot_url=screenshot_url,
+    )
+    db.add(new_ticket)
+    db.commit()
+    db.refresh(new_ticket)
+    return new_ticket
+
+# ---------- NOTIFICATION CRUD ----------
+
+def create_notification(db: Session, agent_id: int, category: str, title: str, message: str, session_id: str = None):
+    new_notification = models.Notification(
+        agent_id=agent_id,
+        category=category,
+        title=title,
+        message=message,
+        session_id=session_id,
+    )
+    db.add(new_notification)
+    db.commit()
+    db.refresh(new_notification)
+    return new_notification
+
+
+def get_notifications(db: Session, agent_id: int, limit: int = None):
+    query = (
+        db.query(models.Notification)
+        .filter(models.Notification.agent_id == agent_id)
+        .order_by(models.Notification.created_at.desc())
+    )
+    if limit:
+        query = query.limit(limit)
+    return query.all()
+
+
+def get_notification(db: Session, notification_id: int):
+    return db.query(models.Notification).filter(models.Notification.id == notification_id).first()
+
+
+def get_unread_count(db: Session, agent_id: int):
+    return (
+        db.query(models.Notification)
+        .filter(models.Notification.agent_id == agent_id)
+        .filter(models.Notification.is_read == False)
+        .count()
+    )
+
+
+def mark_notification_read(db: Session, notification: models.Notification):
+    notification.is_read = True
+    db.commit()
+    db.refresh(notification)
+    return notification
+
+
+def mark_all_notifications_read(db: Session, agent_id: int):
+    db.query(models.Notification).filter(
+        models.Notification.agent_id == agent_id,
+        models.Notification.is_read == False,
+    ).update({"is_read": True})
+    db.commit()
+
+# ---------- ANALYTICS CRUD ----------
+
+def get_sessions_in_range(db: Session, agent_id: int, start_date, end_date):
+    return (
+        db.query(models.Session)
+        .filter(models.Session.agent_id == agent_id)
+        .filter(models.Session.created_at >= start_date)
+        .filter(models.Session.created_at <= end_date)
+        .all()
+    )
+
+
+def get_active_days_count(db: Session, agent_id: int, start_date, end_date):
+    from sqlalchemy import func, cast, Date
+    rows = (
+        db.query(func.count(func.distinct(cast(models.Session.created_at, Date))))
+        .filter(models.Session.agent_id == agent_id)
+        .filter(models.Session.created_at >= start_date)
+        .filter(models.Session.created_at <= end_date)
+        .scalar()
+    )
+    return rows or 0
+
+
+def get_session_message_bounds(db: Session, session_ids: list):
+    """
+    Returns {session_id: (min_timestamp, max_timestamp)} for every session_id
+    that has at least one message, in a single query rather than N+1.
+    """
+    from sqlalchemy import func
+    if not session_ids:
+        return {}
+    rows = (
+        db.query(
+            models.Message.session_id,
+            func.min(models.Message.timestamp),
+            func.max(models.Message.timestamp),
+        )
+        .filter(models.Message.session_id.in_(session_ids))
+        .group_by(models.Message.session_id)
+        .all()
+    )
+    return {session_id: (min_ts, max_ts) for session_id, min_ts, max_ts in rows}
+
+
+def get_reports_for_sessions(db: Session, session_ids: list):
+    if not session_ids:
+        return []
+    return db.query(models.Report).filter(models.Report.session_id.in_(session_ids)).all()
+
+
+def get_customer_frustration_scores(db: Session, agent_id: int, start_date, end_date):
+    """Raw frustration_score values (non-null) for customer turns in range, for Sentiment Overview."""
+    rows = (
+        db.query(models.Message.frustration_score)
+        .join(models.Session, models.Session.id == models.Message.session_id)
+        .filter(models.Session.agent_id == agent_id)
+        .filter(models.Message.sender == "customer")
+        .filter(models.Message.frustration_score.isnot(None))
+        .filter(models.Message.timestamp >= start_date)
+        .filter(models.Message.timestamp <= end_date)
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+def get_customer_messages_with_escalation(db: Session, agent_id: int, start_date, end_date):
+    """Customer messages with a non-null escalation_json, for Escalations Over Time."""
+    return (
+        db.query(models.Message)
+        .join(models.Session, models.Session.id == models.Message.session_id)
+        .filter(models.Session.agent_id == agent_id)
+        .filter(models.Message.sender == "customer")
+        .filter(models.Message.escalation_json.isnot(None))
+        .filter(models.Message.timestamp >= start_date)
+        .filter(models.Message.timestamp <= end_date)
+        .all()
+    )
+
+
+# ---------- REPLAY VIEW CRUD ----------
+
+def log_replay_view(db: Session, agent_id: int, session_id: str):
+    new_view = models.ReplayView(
+        agent_id=agent_id,
+        session_id=session_id,
+    )
+    db.add(new_view)
+    db.commit()
+    db.refresh(new_view)
+    return new_view
+
+
+def get_replay_views_count(db: Session, agent_id: int, start_date, end_date):
+    return (
+        db.query(models.ReplayView)
+        .filter(models.ReplayView.agent_id == agent_id)
+        .filter(models.ReplayView.viewed_at >= start_date)
+        .filter(models.ReplayView.viewed_at <= end_date)
+        .count()
+    )

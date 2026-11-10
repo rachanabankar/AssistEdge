@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, field_validator
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
@@ -105,14 +106,18 @@ class ResetPasswordRequest(BaseModel):
 # ---------- POST /auth/signup ----------
 @router.post("/signup", dependencies=[Depends(rate_limit("5/min", "signup"))])
 def signup(payload: SignupRequest, db: Session = Depends(get_db)):
-    existing = crud.get_agent_by_username(db, payload.username)
+    existing = crud.get_agent_by_username(db, payload.username) or crud.get_agent_by_email(db, payload.username)
     if existing:
-        raise HTTPException(status_code=400, detail="Username already taken")
+        raise HTTPException(status_code=400, detail="Unable to create account with these details")
 
     password_hash = hash_password(payload.password)
-    new_agent = crud.create_agent(db, username=payload.username, password_hash=password_hash)
+    try:
+        new_agent = crud.create_agent(db, username=payload.username, password_hash=password_hash)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Unable to create account with these details") from None
 
-    token = create_access_token(agent_id=new_agent.id, username=new_agent.username)
+    token = create_access_token(agent_id=new_agent.id, username=new_agent.username, token_version=new_agent.token_version)
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -131,7 +136,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not verify_password(payload.password, agent.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    token = create_access_token(agent_id=agent.id, username=agent.username)
+    token = create_access_token(agent_id=agent.id, username=agent.username, token_version=agent.token_version)
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -168,16 +173,12 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     # 1. Already linked to this Google account -> just log them in.
     agent = crud.get_agent_by_google_id(db, google_id)
 
-    # 2. Not linked, but an existing account shares this email -> do NOT
-    #    auto-link (account-takeover risk). The user must log in with their
-    #    password instead.
+    # The Google verifier and email_verified guard above authenticate the email.
+    # Existing and new accounts receive the same successful login response.
     if not agent and email:
         existing = crud.get_agent_by_email(db, email)
         if existing:
-            raise HTTPException(
-                status_code=409,
-                detail="An account with this email already exists. Please log in with your username and password.",
-            )
+            agent = crud.link_google_account(db, existing, google_id)
 
     # 3. Brand new agent -> create one. password_hash is required by the
     #    schema, so we set it to a random, unusable value the agent will
@@ -193,7 +194,7 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
         if email:
             agent = crud.update_agent_profile(db, agent, email=email, name=name)
 
-    token = create_access_token(agent_id=agent.id, username=agent.username)
+    token = create_access_token(agent_id=agent.id, username=agent.username, token_version=agent.token_version)
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -239,25 +240,8 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
 @router.post("/reset-password", dependencies=[Depends(rate_limit("5/min", "reset-password"))])
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
     token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
-    agent = crud.get_agent_by_reset_token(db, token_hash)
-    if (
-        not agent
-        or not agent.reset_token
-        or not secrets.compare_digest(agent.reset_token, token_hash)
-        or not agent.reset_token_expiry
-    ):
-        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
-
-    expiry = agent.reset_token_expiry
-    if expiry.tzinfo is None:
-        expiry = expiry.replace(tzinfo=timezone.utc)
-
-    if expiry < datetime.now(timezone.utc):
-        crud.clear_reset_token(db, agent)
-        raise HTTPException(status_code=400, detail="This reset link has expired. Please request a new one.")
-
     new_hash = hash_password(payload.new_password)
-    crud.change_agent_password(db, agent, new_hash)
-    crud.clear_reset_token(db, agent)
+    if not crud.reset_password_and_revoke(db, token_hash, new_hash):
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
 
     return {"message": "Password reset successful. Please log in with your new password."}

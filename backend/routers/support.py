@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 import os, uuid
+from utils.uploads import safe_ext, read_bounded, require_image
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from models.database import get_db
 from models import crud
+from ratelimit import agent_rate_limit_check
 from utils.auth import get_current_agent
 
 router = APIRouter(prefix="/support", tags=["Support"])
@@ -29,23 +31,21 @@ def _serialize(ticket):
 
 @router.post("/tickets")
 async def create_ticket(
-    issue_type: str = Form(...),
-    subject: str = Form(...),
-    priority: str = Form(...),
+    issue_type: str = Form(..., min_length=1, max_length=50),
+    subject: str = Form(..., min_length=1, max_length=200),
+    priority: str = Form(..., min_length=1, max_length=20),
     screenshot: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_agent=Depends(get_current_agent),
 ):
+    agent_rate_limit_check(current_agent.id, "10/min", "support-ticket")
+
     screenshot_url = None
 
     if screenshot is not None:
-        ext = os.path.splitext(screenshot.filename)[1].lower()
-        if ext not in ALLOWED_EXTENSIONS:
-            raise HTTPException(status_code=400, detail="Unsupported file type")
-
-        contents = await screenshot.read()
-        if len(contents) > MAX_SIZE_BYTES:
-            raise HTTPException(status_code=400, detail="File too large (max 2MB)")
+        ext = safe_ext(screenshot.filename, ALLOWED_EXTENSIONS)
+        contents = await read_bounded(screenshot, MAX_SIZE_BYTES)
+        require_image(ext, contents)
 
         filename = f"{current_agent.id}_{uuid.uuid4().hex}{ext}"
         filepath = os.path.join(SCREENSHOT_DIR, filename)

@@ -5,5 +5,16 @@
 chroma*/
 uploads/
 venv/
+.venv/
+node_modules/
+dist/
+chroma/
+chroma_db/
 __pycache__/
 
+*.db
+*.db.bak-*
+dupcheck.py
+migrate_step78.py
+audit_paste.txt
+audit_utils_auth.txt
