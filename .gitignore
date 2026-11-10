@@ -82,3 +82,4 @@ lerna-debug.log*
 
 /chroma_db/
 /uploaded_docs/
+client_secret*.json
