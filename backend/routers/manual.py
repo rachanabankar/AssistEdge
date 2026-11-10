@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from typing import Literal
 from sqlalchemy.orm import Session as DBSession
 
 from models import crud
@@ -13,14 +14,21 @@ router = APIRouter(prefix="/manual", tags=["Manual"])
 
 
 class Turn(BaseModel):
-    sender: str = Field(max_length=20)
+    sender: Literal["customer", "agent"]
     content: str = Field(max_length=4000)
 
 
 class ManualMessageRequest(BaseModel):
     session_id: str = Field(max_length=64)
     customer_message: str = Field(max_length=4000)
-    conversation_history: list[Turn] = Field(default_factory=list, max_length=200)
+    conversation_history: list[Turn] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def bound_history(self):
+        if sum(len(turn.content) for turn in self.conversation_history) > 24000:
+            raise ValueError("Conversation history exceeds 24000 characters")
+        return self
+
 
 
 class EndSessionRequest(BaseModel):

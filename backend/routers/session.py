@@ -1,8 +1,11 @@
 import json
 import logging
 import os
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
-from pydantic import BaseModel
+import uuid
+from typing import Annotated
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, Path
+from pydantic import BaseModel, Field
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from sqlalchemy.orm import Session
 
 from agents.summary_agent import generate_report
@@ -19,22 +22,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/session", tags=["Session"])
 UPLOAD_DIR = "uploaded_docs"
-DOC_ALLOWED_EXTENSIONS = {".pdf", ".txt"}
-DOC_MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB limit
+DOC_ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx"}
+DOC_MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB per file
 DOC_CHUNK_SIZE = 1024 * 1024  # 1 MB chunk
 
 
 class SessionCreateRequest(BaseModel):
-    mode: str
-    scenario: str | None = None
-    product_context: str | None = None
-    customer_tone: str | None = None
-    patience_level: str | None = None
+    mode: str = Field(max_length=20)
+    scenario: str | None = Field(None, max_length=2000)
+    product_context: str | None = Field(None, max_length=2000)
+    customer_tone: str | None = Field(None, max_length=50)
+    patience_level: str | None = Field(None, max_length=50)
 
 
 class QueryRequest(BaseModel):
-    query: str
-    k: int = 3
+    query: str = Field(min_length=1, max_length=2000)
+    k: int = Field(3, ge=1, le=10)
 
 
 def _safe_json_loads(data: str | None):
@@ -130,7 +133,7 @@ def list_sessions(
 
 @router.get("/{session_id}")
 def get_session_detail(
-    session_id: str,
+    session_id: Annotated[str, Path(max_length=64)],
     db: Session = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
@@ -154,7 +157,7 @@ def get_session_detail(
 
 @router.get("/{session_id}/messages")
 def get_session_messages(
-    session_id: str,
+    session_id: Annotated[str, Path(max_length=64)],
     db: Session = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
@@ -179,78 +182,65 @@ def get_session_messages(
 
 
 @router.post("/{session_id}/upload-docs")
-def upload_docs(
-    session_id: str,
-    file: UploadFile = File(...),
+async def upload_docs(
+    session_id: Annotated[str, Path(max_length=64)],
+    request: Request,
     db: Session = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
     _get_owned_session_or_404(db, session_id, current_agent)
-
-    # 1. Extension check BEFORE writing to disk
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in DOC_ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type '{ext}'. Allowed extensions: {', '.join(sorted(DOC_ALLOWED_EXTENSIONS))}",
-        )
-
-    # 2. Sanitize filename using basename and prefix with session_id
-    safe_filename = os.path.basename(file.filename or "uploaded_doc")
-    dest_filename = f"{session_id}_{safe_filename}"
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    save_path = os.path.abspath(os.path.join(UPLOAD_DIR, dest_filename))
-    upload_dir_abs = os.path.abspath(UPLOAD_DIR)
-
-    if not save_path.startswith(upload_dir_abs):
-        raise HTTPException(status_code=400, detail="Invalid file path.")
-
-    # 3. Enforce 10MB limit by streaming in chunks and aborting early
-    total_size = 0
-    try:
-        with open(save_path, "wb") as f:
-            while True:
-                chunk = file.file.read(DOC_CHUNK_SIZE)
-                if not chunk:
-                    break
-                total_size += len(chunk)
-                if total_size > DOC_MAX_SIZE_BYTES:
-                    raise HTTPException(
-                        status_code=413,
-                        detail="File exceeds maximum allowed size of 10 MB.",
-                    )
-                f.write(chunk)
-    except HTTPException:
-        if os.path.exists(save_path):
-            os.remove(save_path)
-        raise
-    except Exception as e:
-        logger.exception("Failed to save file: %s", e)
-        if os.path.exists(save_path):
-            os.remove(save_path)
-        raise HTTPException(status_code=500, detail="Failed to save file.")
-
-    # 4. Ingest and handle failure by cleaning up the saved file
-    try:
-        docs = load_document(save_path)
-        chunks = chunk_documents(docs)
-        store_chunks(chunks, session_id=session_id)
-    except Exception as e:
-        logger.exception("Document ingestion failed: %s", e)
-        if os.path.exists(save_path):
-            os.remove(save_path)
-        raise HTTPException(status_code=500, detail="Document ingestion failed.")
-
-    return {
-        "message": "File uploaded successfully",
-        "filename": safe_filename,
-        "chunks_indexed": len(chunks),
-    }
+    # Limit multipart parsing too, before saving any file. Both legacy "file"
+    # and repeated "files" fields are supported.
+    async with request.form(max_files=5, max_fields=5) as form:
+        files = [value for _, value in form.multi_items() if isinstance(value, StarletteUploadFile)]
+        if not files or len(files) > 5:
+            raise HTTPException(status_code=400, detail="Upload between 1 and 5 files.")
+        extensions = [os.path.splitext(file.filename or "")[1].lower() for file in files]
+        if any(ext not in DOC_ALLOWED_EXTENSIONS for ext in extensions):
+            raise HTTPException(status_code=400, detail="Allowed file types: pdf, txt, md, docx.")
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        saved_paths = []
+        results = []
+        try:
+            # Validate and save the entire batch before indexing any of it.
+            for file, ext in zip(files, extensions):
+                storage_name = f"{uuid.uuid4().hex}{ext}"
+                save_path = os.path.join(UPLOAD_DIR, storage_name)
+                with open(save_path, "xb") as destination:
+                    saved_paths.append(save_path)
+                    total_size = 0
+                    while chunk := await file.read(DOC_CHUNK_SIZE):
+                        total_size += len(chunk)
+                        if total_size > DOC_MAX_SIZE_BYTES:
+                            raise HTTPException(status_code=413, detail="File exceeds maximum allowed size of 5 MB.")
+                        destination.write(chunk)
+                results.append({"filename": storage_name})
+            batches = [chunk_documents(load_document(path)) for path in saved_paths]
+            for result, chunks in zip(results, batches):
+                store_chunks(chunks, session_id=session_id)
+                result["chunks_indexed"] = len(chunks)
+        except HTTPException:
+            raise
+        except (ValueError, UnicodeError):
+            logger.exception("Invalid uploaded document")
+            raise HTTPException(status_code=400, detail="Invalid or unsupported document content.") from None
+        except Exception:
+            logger.exception("Document ingestion failed")
+            raise HTTPException(status_code=500, detail="Document ingestion failed.") from None
+        finally:
+            # Only parsed text is retained in the KB; original uploads are never served.
+            for path in saved_paths:
+                if os.path.exists(path):
+                    os.remove(path)
+        if len(results) == 1:
+            return {"message": "File uploaded successfully", **results[0]}
+        return {"message": "Files uploaded successfully", "files": results,
+                "chunks_indexed": sum(item["chunks_indexed"] for item in results)}
 
 
 @router.post("/{session_id}/query")
 def query_session_kb(
-    session_id: str,
+    session_id: Annotated[str, Path(max_length=64)],
     payload: QueryRequest,
     db: Session = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
@@ -273,7 +263,7 @@ def query_session_kb(
 
 @router.get("/{session_id}/report")
 def get_session_report(
-    session_id: str,
+    session_id: Annotated[str, Path(max_length=64)],
     db: Session = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
@@ -288,7 +278,7 @@ def get_session_report(
 
 @router.post("/{session_id}/report")
 def create_session_report(
-    session_id: str,
+    session_id: Annotated[str, Path(max_length=64)],
     db: Session = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
@@ -297,7 +287,8 @@ def create_session_report(
     try:
         report = generate_report(db, session_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Report input validation failed")
+        raise HTTPException(status_code=400, detail="Report cannot be generated from this session.") from None
     except Exception as e:
         logger.exception("Report generation failed: %s", e)
         raise HTTPException(status_code=500, detail="Report generation failed.")
@@ -317,7 +308,7 @@ def create_session_report(
 
 @router.get("/{session_id}/report/pdf")
 def download_session_report_pdf(
-    session_id: str,
+    session_id: Annotated[str, Path(max_length=64)],
     db: Session = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
@@ -334,6 +325,7 @@ def download_session_report_pdf(
     try:
         pdf_bytes = render_report_pdf(session, report, messages)
     except Exception:
+        logger.exception("PDF generation failed")
         raise HTTPException(
             status_code=500, detail="PDF generation failed"
         ) from None

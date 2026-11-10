@@ -1,4 +1,5 @@
 import json
+from utils.llm_safety import agent_messages, parse_output, EscalationOutput
 
 from prompts.escalation_prompt import ESCALATION_SYSTEM_PROMPT
 from utils.groq_client import call_groq
@@ -25,26 +26,8 @@ def assess_escalation_risk(conversation_history: list, frustration_score_history
     if not any(t.get("sender") == "customer" for t in conversation_history):
         raise ValueError("No customer message found in conversation_history to analyze.")
 
-    transcript = "\n".join(
-        f"{'Customer' if turn['sender'] == 'customer' else 'Agent'}: {turn['content']}"
-        for turn in conversation_history
-    )
-    history_line = (
-        f"frustration_score_history: {frustration_score_history}"
-        if frustration_score_history
-        else "frustration_score_history: not provided"
-    )
-
-    user_prompt = (
-        f"Conversation so far:\n\n{transcript}\n\n"
-        f"{history_line}\n\n"
-        f"Assess escalation risk based on the customer's latest message and the trend above."
-    )
-
-    messages = [
-        {"role": "system", "content": ESCALATION_SYSTEM_PROMPT},
-        {"role": "user", "content": user_prompt},
-    ]
+    messages = agent_messages(ESCALATION_SYSTEM_PROMPT, {"conversation": conversation_history, "frustration_history": frustration_score_history},
+                              'Assess escalation risk using the required JSON schema.')
 
     raw_content = call_groq(messages, require_json=True)
     return _parse_json_response(raw_content)
@@ -52,19 +35,10 @@ def assess_escalation_risk(conversation_history: list, frustration_score_history
 
 def _parse_json_response(raw_content: str) -> dict:
     """
-    The LLM sometimes wraps JSON in markdown fences or adds stray text.
-    Strip that before parsing, and fall back to a safe default if parsing fails
-    rather than crashing the whole request.
+    Accept only schema-valid JSON; use a safe default for malformed output.
     """
-    cleaned = raw_content.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`")
-        if cleaned.lower().startswith("json"):
-            cleaned = cleaned[4:]
-    cleaned = cleaned.strip()
-
     try:
-        parsed = json.loads(cleaned)
+        parsed = parse_output(raw_content, EscalationOutput)
         required_keys = {
             "escalation_risk_score",
             "risk_level",
@@ -79,7 +53,7 @@ def _parse_json_response(raw_content: str) -> dict:
         parsed["alert_triggered"] = score >= ALERT_THRESHOLD
 
         return parsed
-    except (json.JSONDecodeError, ValueError) as e:
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
         print(f"Escalation agent: failed to parse model output ({e}). Raw: {raw_content}")
         return {
             "escalation_risk_score": 50,

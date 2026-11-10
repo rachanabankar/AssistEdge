@@ -2,9 +2,12 @@ import sqlite3
 DB_PATH = "coaching_assistant.db"
 conn = sqlite3.connect(DB_PATH)
 cur = conn.cursor()
-for column in ["customer_tone", "patience_level"]:
+for column, statement in [
+    ("customer_tone", "ALTER TABLE sessions ADD COLUMN customer_tone TEXT"),
+    ("patience_level", "ALTER TABLE sessions ADD COLUMN patience_level TEXT"),
+]:
     try:
-        cur.execute(f"ALTER TABLE sessions ADD COLUMN {column} TEXT")
+        cur.execute(statement)
         print(f"Added column: {column}")
     except sqlite3.OperationalError as e:
         print(f"Skipped {column}: {e}")

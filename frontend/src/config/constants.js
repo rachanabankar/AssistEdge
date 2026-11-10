@@ -8,9 +8,6 @@ if (import.meta.env.PROD && !import.meta.env.VITE_API_BASE_URL) {
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
 
-export const WS_BASE_URL =
-  import.meta.env.VITE_WS_BASE_URL || (import.meta.env.DEV ? 'ws://localhost:8000/ws' : '')
-
 // Interaction modes - kept as constants so components/backend payloads
 // use the same string values everywhere instead of hardcoding strings.
 export const INTERACTION_MODES = {

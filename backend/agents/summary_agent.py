@@ -1,4 +1,5 @@
-﻿import json
+import json
+from utils.llm_safety import agent_messages, parse_output, SummaryOutput
 
 from sqlalchemy.orm import Session as DBSession
 
@@ -52,28 +53,8 @@ def build_summary_input(db: DBSession, session_id: str) -> dict:
 
 
 def _build_user_prompt(input_data: dict) -> str:
-    lines = []
-    if input_data.get("scenario"):
-        lines.append(f"Scenario: {input_data['scenario']}")
-    if input_data.get("product_context"):
-        lines.append(f"Product context: {input_data['product_context']}")
-    lines.append("")
-    lines.append("Full transcript with prior sentiment/escalation data on customer turns:")
-    lines.append("")
-
-    for t in input_data["turns"]:
-        role_label = "Customer" if t["sender"] == "customer" else "Agent"
-        line = f"{role_label}: {t['content']}"
-        if t["sender"] == "customer":
-            line += (
-                f"\n  [turn {t['turn']} | frustration_score={t['frustration_score']} "
-                f"| sentiment={t['sentiment']} | escalation={t['escalation']}]"
-            )
-        lines.append(line)
-
-    lines.append("")
-    lines.append("Produce the JSON report as specified.")
-    return "\n".join(lines)
+    return agent_messages(SUMMARY_SYSTEM_PROMPT, input_data,
+                          "Produce the JSON report as specified.")[1]["content"]
 
 
 def _get_fallback_report(fallback_sentiment_journey: list = None) -> dict:
@@ -107,20 +88,10 @@ def _extract_sentiment_journey_from_input(input_data: dict) -> list:
 
 def _parse_summary_response(raw_content: str, fallback_sentiment_journey: list = None) -> dict:
     """
-    Defensive parsing pattern: strip markdown fences, validate
-    required keys, fall back to a safe default schema rather than crashing.
+    Accept only schema-valid JSON; use a safe default for malformed output.
     """
-    cleaned = (raw_content or "").strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`")
-        if cleaned.lower().startswith("json"):
-            cleaned = cleaned[4:]
-    if cleaned.endswith("```"):
-        cleaned = cleaned[:-3]
-    cleaned = cleaned.strip()
-
     try:
-        parsed = json.loads(cleaned)
+        parsed = parse_output(raw_content, SummaryOutput)
         required_keys = {"summary", "resolution_score", "sentiment_journey", "coaching_tips"}
         if not required_keys.issubset(parsed.keys()):
             raise ValueError("Missing expected keys in model response")
@@ -137,12 +108,8 @@ def generate_report(db: DBSession, session_id: str) -> Report:
     """
     input_data = build_summary_input(db, session_id)
     fallback_sentiment_journey = _extract_sentiment_journey_from_input(input_data)
-    user_prompt = _build_user_prompt(input_data)
-
-    messages = [
-        {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
-        {"role": "user", "content": user_prompt},
-    ]
+    messages = agent_messages(SUMMARY_SYSTEM_PROMPT, input_data,
+                              "Produce the JSON report as specified.")
 
     try:
         raw_content = call_groq(messages, require_json=True)

@@ -1,4 +1,5 @@
 import inspect
+import json
 import os
 import time
 import requests
@@ -123,7 +124,11 @@ def call_groq(
             raw_content = ""
         raw_content = raw_content.strip()
 
-        if require_json and "{" not in raw_content:
+        try:
+            if require_json:
+                if len(raw_content) > 100000 or not isinstance(json.loads(raw_content), dict):
+                    raise ValueError("Expected a bounded JSON object")
+        except (ValueError, TypeError):
             last_error = RuntimeError(f"Model '{model}' returned non-JSON response: {raw_content}")
             print(f"Groq client: non-JSON response from model '{model}'. Falling back to next model...")
             continue

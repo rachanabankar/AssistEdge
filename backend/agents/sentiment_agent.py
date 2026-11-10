@@ -1,4 +1,5 @@
 import json
+from utils.llm_safety import agent_messages, parse_output, SentimentOutput
 
 from prompts.sentiment_prompt import SENTIMENT_SYSTEM_PROMPT
 from utils.groq_client import call_groq
@@ -21,16 +22,8 @@ def analyze_sentiment(conversation_history: list) -> dict:
     if not any(t.get("sender") == "customer" for t in conversation_history):
         raise ValueError("No customer message found in conversation_history to analyze.")
 
-    transcript = "\n".join(
-        f"{'Customer' if turn['sender'] == 'customer' else 'Agent'}: {turn['content']}"
-        for turn in conversation_history
-    )
-    user_prompt = f"Conversation so far:\n\n{transcript}\n\nAnalyze the customer's latest message above."
-
-    messages = [
-        {"role": "system", "content": SENTIMENT_SYSTEM_PROMPT},
-        {"role": "user", "content": user_prompt},
-    ]
+    messages = agent_messages(SENTIMENT_SYSTEM_PROMPT, {"conversation": conversation_history},
+                              'Analyze the latest customer message using the required JSON schema.')
 
     raw_content = call_groq(messages, require_json=True)
     return _parse_json_response(raw_content)
@@ -38,24 +31,15 @@ def analyze_sentiment(conversation_history: list) -> dict:
 
 def _parse_json_response(raw_content: str) -> dict:
     """
-    The LLM sometimes wraps JSON in markdown fences or adds stray text.
-    Strip that before parsing, and fall back to a safe default if parsing fails
-    rather than crashing the whole request.
+    Accept only schema-valid JSON; use a safe default for malformed output.
     """
-    cleaned = raw_content.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`")
-        if cleaned.lower().startswith("json"):
-            cleaned = cleaned[4:]
-    cleaned = cleaned.strip()
-
     try:
-        parsed = json.loads(cleaned)
+        parsed = parse_output(raw_content, SentimentOutput)
         required_keys = {"intent", "emotional_state", "frustration_score", "satisfaction_trend"}
         if not required_keys.issubset(parsed.keys()):
             raise ValueError("Missing expected keys in model response")
         return parsed
-    except (json.JSONDecodeError, ValueError) as e:
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
         print(f"Sentiment agent: failed to parse model output ({e}). Raw: {raw_content}")
         return {
             "intent": "unknown",

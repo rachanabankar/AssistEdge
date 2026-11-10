@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 # config must be imported before anything that reads env vars at import time
 # (utils/auth.py reads SECRET_KEY). It also loads .env via load_dotenv().
-from config import APP_ENV
+from config import APP_ENV, CORS_ORIGINS
 
 from models.database import Base, engine
 from models import models  # noqa: F401 - registers ORM models with Base
@@ -26,23 +26,6 @@ os.makedirs("static/support_screenshots", exist_ok=True)
 # CORS_ORIGINS must be set in production. In development the env var may be
 # omitted and the default localhost list is used.  Entries are trimmed and
 # empty strings are dropped.
-_raw_origins = os.getenv("CORS_ORIGINS", "")
-_cors_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
-if "*" in _cors_origins:
-    raise RuntimeError("CORS_ORIGINS must not contain '*'.")
-
-if not _cors_origins:
-    if APP_ENV != "development":
-        raise RuntimeError(
-            "CORS_ORIGINS must be set to a comma-separated list of allowed origins "
-            "when APP_ENV is not 'development'."
-        )
-    # Safe local-dev defaults
-    _cors_origins = [
-        "http://localhost:5173",
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-    ]
 
 # --- FastAPI app ------------------------------------------------------------
 # Disable interactive docs in production - they expose the full API surface.
@@ -56,9 +39,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Auth uses a Bearer header, not cookies, so credentials are not needed.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -71,7 +54,9 @@ async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    if APP_ENV == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
     return response
 
 
