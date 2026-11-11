@@ -1,0 +1,57 @@
+[
+  {
+    "check": "Health",
+    "result": "PASS",
+    "detail": "{\"status\":\"ok\"}"
+  },
+  {
+    "check": "Production mode",
+    "result": "PASS",
+    "detail": "Docs disabled and HSTS present"
+  },
+  {
+    "check": "Signup",
+    "result": "PASS",
+    "detail": "HTTP 200; token issued=True"
+  },
+  {
+    "check": "Login",
+    "result": "PASS",
+    "detail": "Login HTTP 200; authenticated profile HTTP 200"
+  },
+  {
+    "check": "Missing token",
+    "result": "PASS",
+    "detail": "HTTP 401"
+  },
+  {
+    "check": "Disallowed Origin",
+    "result": "PASS",
+    "detail": "CORS headers: {}"
+  },
+  {
+    "check": "Allowed Origin",
+    "result": "PASS",
+    "detail": "HTTP 200; localhost permitted"
+  },
+  {
+    "check": "Forgot password",
+    "result": "PASS",
+    "detail": "Existing and unknown account: generic message only; no URL/token"
+  },
+  {
+    "check": "pgvector upload",
+    "result": "PASS",
+    "detail": "HTTP 200: {\"message\":\"File uploaded successfully\",\"filename\":\"b2987ba5c82f4e72bae2c94a93663bec.txt\",\"chunks_indexed\":1}"
+  },
+  {
+    "check": "pgvector persistence",
+    "result": "PASS",
+    "detail": "Stored 1 real 384-dimensional PostgreSQL vectors"
+  },
+  {
+    "check": "pgvector search",
+    "result": "PASS",
+    "detail": "HTTP 200; matches=1"
+  }
+]

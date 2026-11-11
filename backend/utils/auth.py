@@ -13,7 +13,7 @@ from models import crud
 
 load_dotenv()
 
-SECRET_KEY = (os.getenv("SECRET_KEY") or "").strip()
+from config import SECRET_KEY
 
 # Validate the JWT secret at import time so the app refuses to start with an
 # insecure configuration. Any caller that imports this module (including main.py)

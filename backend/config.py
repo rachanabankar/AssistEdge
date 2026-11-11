@@ -17,9 +17,9 @@ class Settings(BaseSettings):
         hide_input_in_errors=True, case_sensitive=True,
     )
 
-    APP_ENV: str = Field(default="production", validation_alias=AliasChoices("APP_ENV", "ENV"))
+    APP_ENV: str = Field(default="production", validation_alias=AliasChoices("ENV", "APP_ENV"))
     DATABASE_URL: str = "sqlite:///./assistedge.db"
-    SECRET_KEY: str
+    SECRET_KEY: str = Field(validation_alias=AliasChoices("JWT_SECRET", "SECRET_KEY"))
     GROQ_API_KEY: str = Field(default="", validate_default=True)
     GROQ_MODELS: str | None = None
     GROQ_MODEL_SENTIMENT: str | None = None
