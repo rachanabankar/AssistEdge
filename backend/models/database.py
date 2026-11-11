@@ -29,6 +29,9 @@ def init_database():
     from models import models  # noqa: F401 - registers every model with Base
 
     Base.metadata.create_all(bind=engine)
+    from rag.vectorstore import init_vectorstore
+
+    init_vectorstore()
 
 
 def get_db():

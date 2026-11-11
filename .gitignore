@@ -43,6 +43,7 @@ backend/**/*.pyc
 *.sqlite
 *.sqlite3
 backend/chroma_db/
+backend/fastembed_cache/
 
 # Backend runtime/generated data
 backend/uploaded_docs/

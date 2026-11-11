@@ -34,10 +34,18 @@ class Settings(BaseSettings):
     FRONTEND_BASE_URL: str = "http://localhost:5173"
     UPLOAD_DIR: str = "static"
     CHROMA_PERSIST_DIR: str = "./chroma_db"
+    VECTOR_STORE: str = "chroma"
     EMBEDDING_PROVIDER: str = "local"
     FASTEMBED_CACHE_PATH: str = str(Path(gettempdir()) / "fastembed_cache")
     HF_API_TOKEN: str | None = None
     RATE_LIMIT_ENABLED: str = "true"
+
+    @field_validator("VECTOR_STORE")
+    @classmethod
+    def validate_vector_store(cls, value: str) -> str:
+        if value not in {"chroma", "pgvector"}:
+            raise ValueError("VECTOR_STORE must be 'chroma' or 'pgvector'.")
+        return value
 
     @field_validator("GROQ_API_KEY")
     @classmethod
@@ -50,6 +58,10 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_database(self) -> "Settings":
         database_url = self.DATABASE_URL.strip()
+        if self.VECTOR_STORE == "pgvector" and not database_url.lower().startswith(
+            ("postgres://", "postgresql://", "postgresql+")
+        ):
+            raise ValueError("VECTOR_STORE=pgvector requires a PostgreSQL DATABASE_URL.")
         if self.APP_ENV == "production" and (
             not database_url or database_url.lower().startswith("sqlite")
         ):
@@ -113,6 +125,7 @@ CORS_ORIGINS = settings.cors_origins
 FRONTEND_BASE_URL = settings.FRONTEND_BASE_URL
 UPLOAD_DIR = settings.UPLOAD_DIR
 CHROMA_PERSIST_DIR = settings.CHROMA_PERSIST_DIR
+VECTOR_STORE = settings.VECTOR_STORE
 EMBEDDING_PROVIDER = settings.EMBEDDING_PROVIDER
 FASTEMBED_CACHE_PATH = settings.FASTEMBED_CACHE_PATH
 HF_API_TOKEN = settings.HF_API_TOKEN
