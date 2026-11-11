@@ -1,12 +1,12 @@
 // Central place for environment-driven configuration.
 // Values come from Vite env vars (see .env.example).
 
-if (import.meta.env.PROD && !import.meta.env.VITE_API_BASE_URL) {
-  throw new Error('VITE_API_BASE_URL is required in production.');
+if (!import.meta.env.DEV && !import.meta.env.VITE_API_URL?.trim()) {
+  throw new Error('VITE_API_URL is required in production.');
 }
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
+  import.meta.env.VITE_API_URL?.trim() || (import.meta.env.DEV ? 'http://localhost:8000' : '')
 
 // Interaction modes - kept as constants so components/backend payloads
 // use the same string values everywhere instead of hardcoding strings.
