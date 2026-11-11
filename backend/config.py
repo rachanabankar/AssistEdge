@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from dotenv import load_dotenv
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).resolve().parent / ".env"
@@ -16,20 +16,30 @@ class Settings(BaseSettings):
         hide_input_in_errors=True, case_sensitive=True,
     )
 
-    APP_ENV: str = Field(default="development", validation_alias=AliasChoices("ENV", "APP_ENV"))
+    APP_ENV: str = Field(default="production", validation_alias=AliasChoices("APP_ENV", "ENV"))
     DATABASE_URL: str = "sqlite:///./assistedge.db"
     SECRET_KEY: str
     JWT_EXPIRE_MINUTES: int = 60
-    OPENROUTER_API_KEY: str | None = None
     GOOGLE_CLIENT_ID: str | None = None
-    GOOGLE_CLIENT_SECRET: str | None = None
     CORS_ORIGINS: str = ""
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
     UPLOAD_DIR: str = "static"
     CHROMA_PERSIST_DIR: str = "./chroma_db"
     EMBEDDING_PROVIDER: str = "local"
     HF_API_TOKEN: str | None = None
     RATE_LIMIT_ENABLED: str = "true"
+
+    @model_validator(mode="after")
+    def validate_production_database(self) -> "Settings":
+        database_url = self.DATABASE_URL.strip()
+        if self.APP_ENV == "production" and (
+            not database_url or database_url.lower().startswith("sqlite")
+        ):
+            raise ValueError(
+                "DATABASE_URL must be non-empty and must not use SQLite "
+                "when APP_ENV=production."
+            )
+        return self
 
     @field_validator("APP_ENV")
     @classmethod
@@ -80,11 +90,9 @@ APP_ENV = settings.APP_ENV
 DATABASE_URL = settings.DATABASE_URL
 SECRET_KEY = settings.SECRET_KEY
 JWT_EXPIRE_MINUTES = settings.JWT_EXPIRE_MINUTES
-OPENROUTER_API_KEY = settings.OPENROUTER_API_KEY
 GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET = settings.GOOGLE_CLIENT_SECRET
 CORS_ORIGINS = settings.cors_origins
-FRONTEND_URL = settings.FRONTEND_URL
+FRONTEND_BASE_URL = settings.FRONTEND_BASE_URL
 UPLOAD_DIR = settings.UPLOAD_DIR
 CHROMA_PERSIST_DIR = settings.CHROMA_PERSIST_DIR
 EMBEDDING_PROVIDER = settings.EMBEDDING_PROVIDER

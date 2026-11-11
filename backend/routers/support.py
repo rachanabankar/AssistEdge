@@ -11,7 +11,7 @@ from utils.auth import get_current_agent
 
 router = APIRouter(prefix="/support", tags=["Support"])
 
-SCREENSHOT_DIR = "static/support_screenshots"
+from paths import SCREENSHOT_DIR
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_SIZE_BYTES = 2 * 1024 * 1024  # 2MB, same limit as avatar uploads
 

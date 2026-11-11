@@ -12,7 +12,7 @@ from ratelimit import agent_rate_limit_check
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 
-AVATAR_DIR = "static/avatars"
+from paths import AVATAR_DIR
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_SIZE_BYTES = 2 * 1024 * 1024  # 2MB, matches the UI copy ("Maximum 2MB")
 PROFILE_EDITABLE_FIELDS = {"name", "phone", "department", "time_zone", "language"}

@@ -1,3 +1,4 @@
+# legacy, SQLite-only, not needed for a fresh Postgres database
 """
 One-off migration: drop the dead `notify_email` column from `agents`.
 

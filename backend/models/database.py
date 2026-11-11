@@ -23,6 +23,14 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Base is the parent class all your models (tables) will inherit from
 Base = declarative_base()
 
+
+def init_database():
+    """Register all models and create missing tables without altering existing ones."""
+    from models import models  # noqa: F401 - registers every model with Base
+
+    Base.metadata.create_all(bind=engine)
+
+
 def get_db():
     db = SessionLocal()
     try:

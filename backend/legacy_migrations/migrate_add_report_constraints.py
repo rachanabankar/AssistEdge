@@ -1,3 +1,4 @@
+# legacy, SQLite-only, not needed for a fresh Postgres database
 """
 models/migrate_add_report_constraints.py
 

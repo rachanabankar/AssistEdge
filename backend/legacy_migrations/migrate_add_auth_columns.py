@@ -1,3 +1,4 @@
+# legacy, SQLite-only, not needed for a fresh Postgres database
 """
 Run once: python migrate_add_auth_columns.py
 Adds the 3 new columns needed for Google login + forgot password to the

@@ -1,3 +1,4 @@
+# legacy, SQLite-only, not needed for a fresh Postgres database
 import sqlite3
 DB_PATH = "coaching_assistant.db"
 conn = sqlite3.connect(DB_PATH)

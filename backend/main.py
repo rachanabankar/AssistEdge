@@ -1,5 +1,5 @@
 import logging
-import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -10,17 +10,14 @@ from fastapi.staticfiles import StaticFiles
 # config must be imported before anything that reads env vars at import time
 # (utils/auth.py reads SECRET_KEY). It also loads .env via load_dotenv().
 from config import APP_ENV, CORS_ORIGINS
+from paths import UPLOAD_DIR, create_directories
 
-from models.database import Base, engine
-from models import models  # noqa: F401 - registers ORM models with Base
+from models.database import init_database
 from routers import analytics, auth, manual, notifications, profile, session, simulate, support
 
 logger = logging.getLogger(__name__)
 
-Base.metadata.create_all(bind=engine)
 
-os.makedirs("static/avatars", exist_ok=True)
-os.makedirs("static/support_screenshots", exist_ok=True)
 
 # --- CORS -------------------------------------------------------------------
 # CORS_ORIGINS must be set in production. In development the env var may be
@@ -28,13 +25,20 @@ os.makedirs("static/support_screenshots", exist_ok=True)
 # empty strings are dropped.
 
 # --- FastAPI app ------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_directories()
+    init_database()
+    yield
+
+
 # Disable interactive docs in production - they expose the full API surface.
 if APP_ENV != "development":
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 else:
-    app = FastAPI()
+    app = FastAPI(lifespan=lifespan)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=UPLOAD_DIR, check_dir=False), name="static")
 
 # Auth uses a Bearer header, not cookies, so credentials are not needed.
 app.add_middleware(
@@ -95,3 +99,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 @app.get("/")
 def root():
     return {"message": "Backend is running"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

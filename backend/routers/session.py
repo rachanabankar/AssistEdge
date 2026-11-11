@@ -21,7 +21,7 @@ from utils.pdf_generator import render_report_pdf
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/session", tags=["Session"])
-UPLOAD_DIR = "uploaded_docs"
+from paths import UPLOAD_DIR
 DOC_ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx"}
 DOC_MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB per file
 DOC_CHUNK_SIZE = 1024 * 1024  # 1 MB chunk
@@ -198,7 +198,6 @@ async def upload_docs(
         extensions = [os.path.splitext(file.filename or "")[1].lower() for file in files]
         if any(ext not in DOC_ALLOWED_EXTENSIONS for ext in extensions):
             raise HTTPException(status_code=400, detail="Allowed file types: pdf, txt, md, docx.")
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
         saved_paths = []
         results = []
         try:
