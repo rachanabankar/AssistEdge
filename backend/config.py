@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     APP_ENV: str = Field(default="production", validation_alias=AliasChoices("APP_ENV", "ENV"))
     DATABASE_URL: str = "sqlite:///./assistedge.db"
     SECRET_KEY: str
+    GROQ_API_KEY: str = Field(default="", validate_default=True)
+    GROQ_MODELS: str | None = None
+    GROQ_MODEL_SENTIMENT: str | None = None
+    GROQ_MODEL_COACHING: str | None = None
+    GROQ_MODEL_ESCALATION: str | None = None
+    GROQ_MODEL_SUMMARY: str | None = None
+    GROQ_MODEL_SIMULATOR: str | None = None
+    GROQ_TIMEOUT_SECONDS: float = 20
     JWT_EXPIRE_MINUTES: int = 60
     GOOGLE_CLIENT_ID: str | None = None
     CORS_ORIGINS: str = ""
@@ -28,6 +36,14 @@ class Settings(BaseSettings):
     EMBEDDING_PROVIDER: str = "local"
     HF_API_TOKEN: str | None = None
     RATE_LIMIT_ENABLED: str = "true"
+
+    @field_validator("GROQ_API_KEY")
+    @classmethod
+    def validate_groq_api_key(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("GROQ_API_KEY is required and must not be empty. Set it in backend/.env or the environment.")
+        return value
 
     @model_validator(mode="after")
     def validate_production_database(self) -> "Settings":

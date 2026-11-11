@@ -139,7 +139,7 @@ backend/
 │   ├── notifications.py
 │   └── analytics.py
 ├── utils/
-│   ├── openrouter_client.py
+│   ├── groq_client.py
 │   └── auth.py                   # password hashing, JWT issuing/validation, reset tokens
 ├── templates/
 │   └── report.html               # PDF report template
@@ -163,9 +163,6 @@ frontend/
 ---
 
 ## Challenges & How They Were Solved
-
-**1. OpenRouter model slug format caused silent failures.**
-Using a bare model name (e.g. `gemma-4-31b-it:free`) instead of the full provider-prefixed slug (`google/gemma-4-31b-it:free`) caused failures that looked like rate limiting but weren't. Fixed by always using the full prefixed slug, then moved to the `openrouter/free` auto-router for better resilience against free-tier model congestion across all OpenRouter users.
 
 **2. A test script wasn't actually testing what it claimed to.**
 `test_simulator.py` accepted a CLI argument to run one isolated test at a time, but never read it — it silently ran all three tests back-to-back on every invocation. This was the real cause of the original "rate limited" errors, since intended spacing between test calls never happened. Fixed by properly using `sys.argv` so each test makes exactly one isolated API call.
@@ -255,6 +252,7 @@ RESEND_API_KEY=re_your_resend_api_key_here
 RESEND_FROM_EMAIL=onboarding@resend.dev
 ```
 
+- Optional `GROQ_MODELS` and `GROQ_MODEL_SENTIMENT`, `GROQ_MODEL_COACHING`, `GROQ_MODEL_ESCALATION`, `GROQ_MODEL_SUMMARY`, and `GROQ_MODEL_SIMULATOR` override model selection. `GROQ_TIMEOUT_SECONDS` defaults to 20.
 - `GROQ_API_KEY` is required for live coaching, customer simulation, sentiment analysis, and summary report generation. Get a key from the [Groq Console](https://console.groq.com/keys).
 - `SECRET_KEY` signs and verifies login JWTs in `backend/utils/auth.py` (`create_access_token` / `decode_access_token`, HS256, 24-hour expiry via `ACCESS_TOKEN_EXPIRE_MINUTES`) — generate a secure random secret using `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 - `GOOGLE_CLIENT_ID` is optional, needed only for Google OAuth login.
@@ -308,7 +306,7 @@ To test the forgot-password flow locally, request a reset from the UI — the re
 
 - **SQLite as the database** — simple for local/demo use, but not designed for concurrent writers; a production deployment would move to Postgres or similar.
 - **No Alembic (or other migration tool)** — schema changes are currently applied via one-off `ALTER TABLE` scripts, which doesn't scale well and has no rollback story.
-- **`openrouter/free` auto-router rate limits** — the app depends on OpenRouter's free tier, which is shared across all users and can throttle or queue requests under load; a production deployment would use a paid model/tier.
+- **Groq free-tier rate limits** ? free-tier rate limits apply per model, which is why the client falls back across `GROQ_MODELS`.
 - **Limited automated test coverage** — `test_simulator.py` covers the simulator agent in isolation; there's no broader test suite (unit, integration, or end-to-end) yet.
 - **No CI/CD pipeline** — builds, linting, and tests are run manually.
 - **Single-tenant local file storage** — uploaded knowledge base documents and avatars are stored on local disk (`backend/uploaded_docs/`, `backend/static/avatars/`), which won't work as-is across multiple server instances.

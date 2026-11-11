@@ -83,3 +83,8 @@ lerna-debug.log*
 /chroma_db/
 /uploaded_docs/
 client_secret*.json
+
+# Local scratch scripts
+reset_pw.py
+_tmp_set_email.py
+_patch_pdf.py

@@ -1,11 +1,15 @@
 import inspect
 import json
+import logging
 import os
 import time
 import requests
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+GROQ_TIMEOUT_SECONDS = float(os.getenv("GROQ_TIMEOUT_SECONDS", "20"))
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -102,20 +106,22 @@ def call_groq(
         }
 
         try:
-            response = requests.post(GROQ_URL, headers=headers, json=payload, timeout=30)
+            response = requests.post(GROQ_URL, headers=headers, json=payload, timeout=GROQ_TIMEOUT_SECONDS)
         except requests.exceptions.RequestException as e:
             last_error = e
-            print(f"Groq client: request error with model '{model}' ({e}). Falling back to next model...")
+            logger.warning("Groq client: request error with model %r. Falling back to next model...", model)
             continue
 
         if response.status_code in FALLBACK_STATUS_CODES:
-            last_error = RuntimeError(f"Model '{model}' failed with status {response.status_code}: {response.text}")
-            print(f"Groq client: model '{model}' returned HTTP {response.status_code}. Falling back to next model...")
+            last_error = RuntimeError(f"Groq API error {response.status_code}")
+            logger.warning("Groq upstream HTTP %s: %.500s", response.status_code, response.text)
+            logger.warning("Groq client: model %r returned HTTP %s. Falling back to next model...", model, response.status_code)
             continue
 
         if not response.ok:
             # Fatal client errors (400, 401, etc.) - stop and raise immediately
-            raise RuntimeError(f"Groq API error {response.status_code}: {response.text}")
+            logger.error("Groq upstream HTTP %s: %.500s", response.status_code, response.text)
+            raise RuntimeError(f"Groq API error {response.status_code}")
 
         data = response.json()
         choice = data.get("choices", [{}])[0]
@@ -129,8 +135,8 @@ def call_groq(
                 if len(raw_content) > 100000 or not isinstance(json.loads(raw_content), dict):
                     raise ValueError("Expected a bounded JSON object")
         except (ValueError, TypeError):
-            last_error = RuntimeError(f"Model '{model}' returned non-JSON response: {raw_content}")
-            print(f"Groq client: non-JSON response from model '{model}'. Falling back to next model...")
+            last_error = RuntimeError(f"Model '{model}' returned non-JSON response")
+            logger.warning("Groq client: non-JSON response from model %r. Falling back to next model...", model)
             continue
 
         return raw_content
