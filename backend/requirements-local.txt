@@ -1,0 +1,5 @@
+-r requirements.txt
+langchain-huggingface==1.2.2
+sentence-transformers==5.6.0
+torch==2.13.0
+transformers==5.13.1

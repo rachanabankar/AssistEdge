@@ -63,7 +63,6 @@ langchain-classic==1.0.8
 langchain-community==0.4.2
 langchain-core==1.4.8
 langchain-google-genai==4.2.6
-langchain-huggingface==1.2.2
 langchain-protocol==0.0.18
 langchain-text-splitters==1.1.2
 langgraph==1.2.7
@@ -132,7 +131,6 @@ rpds-py==2026.6.3
 safetensors==0.8.0
 scikit-learn==1.9.0
 scipy==1.18.0
-sentence-transformers==5.6.0
 setuptools==84.1.0
 shellingham==1.5.4
 simple-websocket==1.1.0
@@ -146,9 +144,7 @@ tenacity==9.1.4
 threadpoolctl==3.6.0
 tinycss2==1.5.1
 tokenizers==0.22.2
-torch==2.13.0
 tqdm==4.68.3
-transformers==5.13.1
 typer==0.26.8
 typing-inspection==0.4.2
 typing_extensions==4.16.0

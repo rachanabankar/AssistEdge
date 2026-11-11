@@ -1,12 +1,13 @@
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from paths import CHROMA_PERSIST_DIR
+from rag.embeddings import create_embeddings
 
-_embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+_embeddings = create_embeddings()
 
 vectorstore = Chroma(
     collection_name="kb_chunks",
     embedding_function=_embeddings,
-    persist_directory="./chroma_db",
+    persist_directory=str(CHROMA_PERSIST_DIR),
 )
 
 RELEVANCE_THRESHOLD = 0.5  # 0 = unrelated, 1 = perfect match
