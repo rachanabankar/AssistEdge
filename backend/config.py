@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "static"
     CHROMA_PERSIST_DIR: str = "./chroma_db"
     EMBEDDING_PROVIDER: str = "local"
+    FASTEMBED_CACHE_PATH: str | None = None
     HF_API_TOKEN: str | None = None
     RATE_LIMIT_ENABLED: str = "true"
 
@@ -112,6 +113,7 @@ FRONTEND_BASE_URL = settings.FRONTEND_BASE_URL
 UPLOAD_DIR = settings.UPLOAD_DIR
 CHROMA_PERSIST_DIR = settings.CHROMA_PERSIST_DIR
 EMBEDDING_PROVIDER = settings.EMBEDDING_PROVIDER
+FASTEMBED_CACHE_PATH = settings.FASTEMBED_CACHE_PATH
 HF_API_TOKEN = settings.HF_API_TOKEN
 RATE_LIMIT_ENABLED = APP_ENV == "production" or (
     settings.RATE_LIMIT_ENABLED.strip().lower() != "false"

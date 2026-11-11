@@ -167,3 +167,7 @@ zopfli==0.4.3
 zstandard==0.25.0
 opentelemetry-exporter-otlp-common==0.66b1
 opentelemetry-semantic-conventions==0.66b1
+fastembed==0.9.1
+loguru==0.7.3
+py-rust-stemmers==0.1.8
+win32-setctime==1.2.1
