@@ -1,2 +1,4 @@
-SQLite-only, kept for reference.
-Fresh databases (including Postgres) are built by create_all on startup.
+SQLite only, never run in production
+
+These are historical, manually invoked SQLite maintenance scripts. Backend
+startup uses models.database.init_database, not this directory.

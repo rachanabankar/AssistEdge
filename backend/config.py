@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import gettempdir
 
 from dotenv import load_dotenv
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).resolve().parent / ".env"
@@ -17,9 +17,9 @@ class Settings(BaseSettings):
         hide_input_in_errors=True, case_sensitive=True,
     )
 
-    APP_ENV: str = Field(default="production", validation_alias=AliasChoices("ENV", "APP_ENV"))
+    APP_ENV: str = "production"
     DATABASE_URL: str = "sqlite:///./assistedge.db"
-    SECRET_KEY: str = Field(validation_alias=AliasChoices("JWT_SECRET", "SECRET_KEY"))
+    SECRET_KEY: str
     GROQ_API_KEY: str = Field(default="", validate_default=True)
     GROQ_MODELS: str | None = None
     GROQ_MODEL_SENTIMENT: str | None = None
@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     def validate_app_env(cls, value: str) -> str:
         value = value.strip()
         if value not in {"development", "production"}:
-            raise ValueError("ENV (or APP_ENV) must be 'development' or 'production'")
+            raise ValueError("APP_ENV must be 'development' or 'production'")
         return value
 
     @field_validator("SECRET_KEY")
@@ -91,7 +91,7 @@ class Settings(BaseSettings):
             len(value) < 32
             or len(set(value)) < 8
             or value.lower() in placeholders
-            or any(marker in value.lower() for marker in ("example", "dummy"))
+            or any(marker in value.lower() for marker in ("example", "dummy", "replace-this"))
         ):
             raise ValueError(
                 "SECRET_KEY must contain at least 32 characters and 8 distinct "
@@ -110,7 +110,7 @@ class Settings(BaseSettings):
             raise RuntimeError("CORS_ORIGINS must not contain '*'.")
         if not origins:
             if self.APP_ENV == "production":
-                raise RuntimeError("CORS_ORIGINS must be non-empty when ENV=production.")
+                raise RuntimeError("CORS_ORIGINS must be non-empty when APP_ENV=production.")
             return ["http://localhost:5173"]
         return origins
 

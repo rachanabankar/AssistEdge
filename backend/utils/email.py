@@ -40,6 +40,6 @@ def send_password_reset_email(to_email: str, reset_link: str) -> bool:
         })
         return True
     except Exception:
-        # Log full detail server-side; the caller only needs to know it failed.
-        logger.exception("Failed to send password reset email to %s", to_email)
+        # Provider exceptions may contain the request body, including reset links.
+        logger.error("Failed to send password reset email through Resend")
         return False

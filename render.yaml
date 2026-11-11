@@ -12,15 +12,29 @@ services:
         value: 3.13.3
       - key: APP_ENV
         value: production
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
       - key: EMBEDDING_PROVIDER
         value: fastembed
       - key: FASTEMBED_CACHE_PATH
         value: /tmp/fastembed_cache
+      - key: VECTOR_STORE
+        value: pgvector
+      - key: UPLOAD_DIR
+        value: /tmp/uploads
+      - key: CHROMA_PERSIST_DIR
+        value: /tmp/chroma_db
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
         sync: false
       - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
         sync: false
       - key: CORS_ORIGINS
         sync: false

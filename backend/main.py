@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 # config must be imported before anything that reads env vars at import time
 # (utils/auth.py reads SECRET_KEY). It also loads .env via load_dotenv().
 from config import APP_ENV, CORS_ORIGINS
-from paths import UPLOAD_DIR, create_directories
+from paths import PUBLIC_UPLOAD_DIR, create_directories
 
 from models.database import init_database
 from routers import analytics, auth, manual, notifications, profile, session, simulate, support
@@ -38,7 +38,7 @@ if APP_ENV != "development":
 else:
     app = FastAPI(lifespan=lifespan)
 
-app.mount("/static", StaticFiles(directory=UPLOAD_DIR, check_dir=False), name="static")
+app.mount("/static", StaticFiles(directory=PUBLIC_UPLOAD_DIR, check_dir=False), name="static")
 
 # Auth uses a Bearer header, not cookies, so credentials are not needed.
 app.add_middleware(

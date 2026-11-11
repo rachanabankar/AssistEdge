@@ -21,7 +21,7 @@ from utils.pdf_generator import render_report_pdf
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/session", tags=["Session"])
-from paths import UPLOAD_DIR
+from paths import KB_UPLOAD_DIR
 DOC_ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx"}
 DOC_MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB per file
 DOC_CHUNK_SIZE = 1024 * 1024  # 1 MB chunk
@@ -204,7 +204,7 @@ async def upload_docs(
             # Validate and save the entire batch before indexing any of it.
             for file, ext in zip(files, extensions):
                 storage_name = f"{uuid.uuid4().hex}{ext}"
-                save_path = os.path.join(UPLOAD_DIR, storage_name)
+                save_path = os.path.join(KB_UPLOAD_DIR, storage_name)
                 with open(save_path, "xb") as destination:
                     saved_paths.append(save_path)
                     total_size = 0

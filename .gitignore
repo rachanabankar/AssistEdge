@@ -50,6 +50,8 @@ backend/uploaded_docs/
 uploads/
 
 # User-uploaded files
+backend/static/public/
+backend/static/kb/
 backend/static/avatars/*
 !backend/static/avatars/.gitkeep
 backend/static/support_screenshots/*
@@ -89,3 +91,5 @@ client_secret*.json
 reset_pw.py
 _tmp_set_email.py
 _patch_pdf.py
+
+.pytest_cache/
