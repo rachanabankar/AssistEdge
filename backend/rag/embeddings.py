@@ -123,8 +123,8 @@ def create_embeddings() -> Embeddings:
     if EMBEDDING_PROVIDER == "fastembed":
         try:
             from fastembed import TextEmbedding
-        except ImportError:
-            raise RuntimeError("The fastembed package is required; pip install fastembed.") from None
+        except ImportError as exc:
+            raise RuntimeError(f"fastembed import failed: {type(exc).__name__}: {exc}") from exc
         return FastEmbedEmbeddings(TextEmbedding)
     if EMBEDDING_PROVIDER == "hosted":
         return HostedEmbeddings(HF_API_TOKEN)

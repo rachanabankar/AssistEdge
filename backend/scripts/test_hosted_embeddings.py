@@ -61,7 +61,7 @@ def main():
             r'HF embeddings returned invalid data; expected one 384-dimensional vector per text\.',
             r'The fastembed package is required; pip install fastembed\.',
         )
-        if not any(re.fullmatch(pattern, message) for pattern in safe):
+        if args.provider != 'fastembed' and not any(re.fullmatch(pattern, message) for pattern in safe):
             message = 'Embedding configuration, model loading, or execution failed; details suppressed to protect credentials.'
         print(f'{type(exc).__name__}: {message}')
         return 1

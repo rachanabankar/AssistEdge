@@ -1,4 +1,5 @@
 from pathlib import Path
+from tempfile import gettempdir
 
 from dotenv import load_dotenv
 from pydantic import AliasChoices, Field, field_validator, model_validator
@@ -34,7 +35,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "static"
     CHROMA_PERSIST_DIR: str = "./chroma_db"
     EMBEDDING_PROVIDER: str = "local"
-    FASTEMBED_CACHE_PATH: str | None = None
+    FASTEMBED_CACHE_PATH: str = str(Path(gettempdir()) / "fastembed_cache")
     HF_API_TOKEN: str | None = None
     RATE_LIMIT_ENABLED: str = "true"
 
