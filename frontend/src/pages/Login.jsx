@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { isServerStartingError } from '../services/api';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -273,7 +274,9 @@ export default function Login() {
       const detail = err?.response?.data?.detail;
       let message = 'Login failed. Check your credentials.';
 
-      if (typeof detail === 'string') {
+      if (isServerStartingError(err)) {
+        message = 'Server is starting, please try again in a moment';
+      } else if (typeof detail === 'string') {
         message = detail;
       } else if (Array.isArray(detail) && detail.length > 0) {
         message = detail.map((d) => d.msg).join(' ');
@@ -294,7 +297,9 @@ export default function Login() {
       navigate('/dashboard', { replace: true });
     } catch (err) {
       const detail = err?.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Google sign-in failed. Please try again.');
+      setError(isServerStartingError(err)
+        ? 'Server is starting, please try again in a moment'
+        : typeof detail === 'string' ? detail : 'Google sign-in failed. Please try again.');
     }
   };
 

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { trackRequest, finishRequest } from '../hooks/useServerWake'
 import { API_BASE_URL, AUTH_TOKEN_KEY, AUTH_AGENT_KEY } from '../config/constants'
 
 const MULTIPART_CONFIG = {
@@ -16,6 +17,7 @@ const AUTH_BYPASS_ENDPOINTS = [
 // Central axios instance - all backend REST calls go through this.
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 90000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -23,7 +25,8 @@ export const apiClient = axios.create({
 
 // Attach the JWT (if present) to every outgoing request.
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY)
+  trackRequest(config)
+  const token = config.skipAuth ? null : localStorage.getItem(AUTH_TOKEN_KEY)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -34,8 +37,13 @@ apiClient.interceptors.request.use((config) => {
 // Also handles global 401s: clear stored auth and bounce to /login,
 // since an expired/invalid JWT means every protected call will 401.
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    finishRequest(response.config)
+    return response
+  },
   (error) => {
+    finishRequest(error.config)
+    if (error.config?.silent) return Promise.reject(error)
     console.error('[API Error]', error?.response?.data || error.message)
 
     const requestUrl = error?.config?.url || ''
@@ -54,6 +62,15 @@ apiClient.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+// Called once at startup, outside React effects so StrictMode cannot duplicate it.
+export function wakeServer() {
+  return apiClient.get('/health', { skipAuth: true, silent: true }).catch(() => {})
+}
+
+export function isServerStartingError(error) {
+  return !error?.response || error.response.status >= 500
+}
 
 // Maps to routers/auth.py
 export const authApi = {
