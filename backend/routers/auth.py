@@ -121,7 +121,7 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "agent": {"id": new_agent.id, "username": new_agent.username},
+        "agent": {"id": new_agent.id, "username": new_agent.username, "has_password": new_agent.has_password},
     }
 
 
@@ -140,7 +140,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "agent": {"id": agent.id, "username": agent.username},
+        "agent": {"id": agent.id, "username": agent.username, "has_password": agent.has_password},
     }
 
 
@@ -189,7 +189,7 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
             username = f"{username}_{secrets.token_hex(3)}"
 
         random_password_hash = hash_password(secrets.token_urlsafe(32))
-        agent = crud.create_agent(db, username=username, password_hash=random_password_hash)
+        agent = crud.create_agent(db, username=username, password_hash=random_password_hash, has_password=False)
         agent = crud.link_google_account(db, agent, google_id)
         if email:
             agent = crud.update_agent_profile(db, agent, email=email, name=name)
@@ -198,7 +198,7 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "agent": {"id": agent.id, "username": agent.username},
+        "agent": {"id": agent.id, "username": agent.username, "has_password": agent.has_password},
     }
 
 

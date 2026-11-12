@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import PasswordInput from '../components/PasswordInput';
 import AuthLayout from '../components/auth/AuthLayout';
 import { authApi } from '../services/api';
 
@@ -78,8 +79,7 @@ export default function ResetPassword() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               New password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Create a new password"
@@ -92,8 +92,7 @@ export default function ResetPassword() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Confirm new password
             </label>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm your new password"

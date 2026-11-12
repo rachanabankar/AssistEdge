@@ -1,11 +1,13 @@
-import { X, Lock, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { X, Lock, ShieldCheck } from "lucide-react";
 import { useState, useEffect } from "react";
+import PasswordInput from "../components/PasswordInput";
 import { profileApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 export default function PrivacySecurityModal({ isOpen, onClose }) {
-  const { updateToken } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
+  const { agent, updateToken, refreshAgent } = useAuth();
+  const isSettingPassword = agent?.has_password === false;
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,7 +22,7 @@ export default function PrivacySecurityModal({ isOpen, onClose }) {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setShowPassword(false);
+
     }
   }, [isOpen]);
 
@@ -35,7 +37,7 @@ export default function PrivacySecurityModal({ isOpen, onClose }) {
       return;
     }
     const enc = new TextEncoder();
-    if (enc.encode(newPassword).length > 72 || enc.encode(currentPassword).length > 72) {
+    if (enc.encode(newPassword).length > 72 || (!isSettingPassword && enc.encode(currentPassword).length > 72)) {
       setError("Passwords must be at most 72 bytes");
       return;
     }
@@ -46,8 +48,9 @@ export default function PrivacySecurityModal({ isOpen, onClose }) {
 
     setLoading(true);
     try {
-      const res = await profileApi.changePassword(currentPassword, newPassword);
+      const res = await profileApi.changePassword(isSettingPassword ? undefined : currentPassword, newPassword);
       if (res.data && res.data.access_token) updateToken(res.data.access_token);
+      await refreshAgent();
       setSuccess(true);
       setCurrentPassword("");
       setNewPassword("");
@@ -123,11 +126,13 @@ export default function PrivacySecurityModal({ isOpen, onClose }) {
 
               <div>
                 <h3 className="text-sm font-bold text-gray-900">
-                  Change Password
+                  {isSettingPassword ? "Set password" : "Change Password"}
                 </h3>
 
                 <p className="text-xs text-gray-400">
-                  Update your account password
+                  {isSettingPassword
+                    ? "You signed in with Google. Set a password to also log in with your email."
+                    : "Update your account password"}
                 </p>
               </div>
 
@@ -135,44 +140,25 @@ export default function PrivacySecurityModal({ isOpen, onClose }) {
 
             <div className="mt-6 space-y-4">
 
-              <input
-                type="password"
+              {!isSettingPassword && <PasswordInput
                 placeholder="Current Password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 className="w-full rounded-xl border border-gray-200
                            px-4 py-3 text-sm outline-none
                            focus:border-indigo-500"
+              />}
+
+              <PasswordInput
+                placeholder="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full rounded-xl border border-gray-200
+                           px-4 py-3 text-sm outline-none
+                           focus:border-indigo-500"
               />
 
-              <div className="relative">
-
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="New Password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200
-                             px-4 py-3 pr-11 text-sm outline-none
-                             focus:border-indigo-500"
-                />
-
-                <button
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2
-                             -translate-y-1/2 text-gray-400"
-                >
-                  {showPassword ? (
-                    <EyeOff size={17} />
-                  ) : (
-                    <Eye size={17} />
-                  )}
-                </button>
-
-              </div>
-
-              <input
-                type="password"
+              <PasswordInput
                 placeholder="Confirm New Password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -200,7 +186,7 @@ export default function PrivacySecurityModal({ isOpen, onClose }) {
                          text-sm font-semibold text-white
                          hover:bg-indigo-700 disabled:opacity-50"
             >
-              {loading ? "Changing..." : "Change Password"}
+              {loading ? (isSettingPassword ? "Setting..." : "Changing...") : (isSettingPassword ? "Set password" : "Change Password")}
             </button>
 
           </div>

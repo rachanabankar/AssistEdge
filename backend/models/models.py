@@ -9,6 +9,7 @@ class Agent(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    has_password = Column(Boolean, nullable=False, default=True, server_default="true")
     created_at = Column(TIMESTAMP, server_default=func.now())
     avatar_url = Column(String, nullable=True)
 

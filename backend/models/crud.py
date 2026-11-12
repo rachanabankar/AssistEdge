@@ -115,10 +115,11 @@ def get_report(db: Session, session_id: str):
 
 # ---------- AGENT CRUD ----------
 
-def create_agent(db: Session, username: str, password_hash: str):
+def create_agent(db: Session, username: str, password_hash: str, has_password: bool = True):
     new_agent = models.Agent(
         username=username,
         password_hash=password_hash,
+        has_password=has_password,
     )
     db.add(new_agent)
     db.commit()
@@ -191,6 +192,7 @@ def reset_password_and_revoke(db: Session, token_hash: str, new_password_hash: s
         models.Agent.reset_token_expiry > datetime.now(timezone.utc),
     ).update({
         models.Agent.password_hash: new_password_hash,
+        models.Agent.has_password: True,
         models.Agent.reset_token: None,
         models.Agent.reset_token_expiry: None,
         models.Agent.token_version: func.coalesce(models.Agent.token_version, 0) + 1,
@@ -225,6 +227,7 @@ def update_agent_avatar(db: Session, agent: models.Agent, avatar_url: str):
 
 def change_agent_password(db: Session, agent: models.Agent, new_password_hash: str):
     agent.password_hash = new_password_hash
+    agent.has_password = True
     db.commit()
     db.refresh(agent)
     return agent
@@ -232,6 +235,7 @@ def change_agent_password(db: Session, agent: models.Agent, new_password_hash: s
 def change_password_and_revoke(db: Session, agent: models.Agent, new_password_hash: str):
     # One commit: new password and old JWTs revoked.
     agent.password_hash = new_password_hash
+    agent.has_password = True
     agent.token_version = (agent.token_version or 0) + 1
     db.commit()
     db.refresh(agent)

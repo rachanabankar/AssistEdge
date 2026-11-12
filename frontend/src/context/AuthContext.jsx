@@ -102,7 +102,8 @@ export function AuthProvider({ children }) {
     logout,
     updateAgent,
     updateToken,
-  }), [token, agent, loading, login, signup, googleLogin, logout, updateAgent, updateToken])
+    refreshAgent: loadFullProfile,
+  }), [token, agent, loading, login, signup, googleLogin, logout, updateAgent, updateToken, loadFullProfile])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

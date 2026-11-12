@@ -29,6 +29,7 @@ def _serialize(agent):
     return {
         "id": agent.id,
         "username": agent.username,
+        "has_password": agent.has_password,
         "name": agent.name,
         "email": agent.email,
         "phone": agent.phone,
@@ -93,13 +94,13 @@ async def upload_avatar(
 
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str
+    current_password: Optional[str] = None
     new_password: str
 
     @field_validator("current_password")
     @classmethod
-    def validate_current_password(cls, v: str) -> str:
-        if len(v.encode("utf-8")) > 72:
+    def validate_current_password(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and len(v.encode("utf-8")) > 72:
             raise ValueError("Password must be at most 72 UTF-8 bytes")
         return v
 
@@ -120,10 +121,13 @@ def change_password(
     db: Session = Depends(get_db),
 ):
     agent_rate_limit_check(agent.id, "5/min", "change-password")
-    if not verify_password(payload.current_password, agent.password_hash):
-        raise HTTPException(status_code=400, detail="Current password is incorrect")
-    if payload.new_password == payload.current_password:
-        raise HTTPException(status_code=400, detail="New password must be different from the current password")
+    if agent.has_password:
+        if payload.current_password is None:
+            raise HTTPException(status_code=422, detail="Current password is required")
+        if not verify_password(payload.current_password, agent.password_hash):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        if payload.new_password == payload.current_password:
+            raise HTTPException(status_code=400, detail="New password must be different from the current password")
     new_hash = hash_password(payload.new_password)
     crud.change_password_and_revoke(db, agent, new_hash)
 
