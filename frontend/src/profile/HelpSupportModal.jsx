@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   X,
   Search,
@@ -14,7 +14,7 @@ import {
 import { helpArticles } from "./helpArticles";
 import { supportApi } from "../services/api";
 
-const SUPPORT_EMAIL = "support@assistedge.com";
+import { SUPPORT_EMAIL } from "../config/constants";
 
 export default function HelpSupportModal({ isOpen, onClose }) {
   const [view, setView] = useState("menu");
@@ -31,6 +31,13 @@ export default function HelpSupportModal({ isOpen, onClose }) {
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
+
+  useEffect(() => {
+    if (!emailCopied) return;
+    const timeout = setTimeout(() => setEmailCopied(false), 2000);
+    return () => clearTimeout(timeout);
+  }, [emailCopied]);
 
   if (!isOpen) return null;
 
@@ -99,10 +106,13 @@ export default function HelpSupportModal({ isOpen, onClose }) {
     }
   }
 
-  function handleOpenEmail() {
-    const subjectLine = encodeURIComponent("AssistEdge Support Request");
-
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subjectLine}`;
+  async function handleCopyEmail() {
+    try {
+      await navigator.clipboard.writeText(SUPPORT_EMAIL);
+      setEmailCopied(true);
+    } catch {
+      setEmailCopied(false);
+    }
   }
 
   const filteredArticles = helpArticles.filter((article) => {
@@ -514,14 +524,34 @@ export default function HelpSupportModal({ isOpen, onClose }) {
                 </ul>
               </div>
 
-              <button
-                onClick={handleOpenEmail}
+              <a
+                href={`mailto:${SUPPORT_EMAIL}?subject=AssistEdge%20Support`}
                 className="w-full rounded-xl bg-indigo-600 py-2.5
                            text-sm font-semibold text-white
                            hover:bg-indigo-700"
+                style={{ display: "block", textAlign: "center" }}
               >
                 Open Email
-              </button>
+              </a>
+
+              <div className="flex items-center justify-center gap-4 text-xs text-indigo-600">
+                <a
+                  href={`https://mail.google.com/mail/?view=cm&fs=1&to=${SUPPORT_EMAIL}&su=AssistEdge%20Support`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  Open in Gmail
+                </a>
+                <button
+                  type="button"
+                  onClick={handleCopyEmail}
+                  className="hover:underline"
+                  aria-live="polite"
+                >
+                  {emailCopied ? "Copied!" : "Copy email address"}
+                </button>
+              </div>
 
             </div>
           )}

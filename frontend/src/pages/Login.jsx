@@ -553,6 +553,12 @@ export default function Login() {
               )}
 
               <p className="mt-3 text-center text-sm text-slate-500">
+                By continuing you agree to the{' '}
+                <Link to="/terms" className="font-medium text-indigo-600 hover:underline">Terms</Link>
+                {' '}and{' '}
+                <Link to="/privacy" className="font-medium text-indigo-600 hover:underline">Privacy Policy</Link>.
+              </p>
+              <p className="mt-3 text-center text-sm text-slate-500">
                 New to AssistEdge?{' '}
                 <Link to="/signup" className="font-semibold text-indigo-600 hover:underline">
                   Create an account

@@ -21,3 +21,5 @@ export const AUTH_TOKEN_KEY = 'assistedge_token'
 
 // localStorage key for the agent object returned alongside the JWT.
 export const AUTH_AGENT_KEY = 'assistedge_agent'
+
+export const SUPPORT_EMAIL = 'assistedge.support@gmail.com'

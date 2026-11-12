@@ -619,6 +619,10 @@ export default function LandingPage() {
       <footer className="bg-gradient-to-r from-slate-950 via-indigo-950 to-purple-950 py-10 text-indigo-200">
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-5 px-5 text-sm sm:px-6">
           <Logo light />
+          <nav aria-label="Legal" className="flex gap-6">
+            <Link to="/privacy" className="hover:underline">Privacy Policy</Link>
+            <Link to="/terms" className="hover:underline">Terms of Service</Link>
+          </nav>
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-2">
             <span className="flex items-center gap-2"><ShieldCheck size={16} aria-hidden="true" /> Secure sign-in</span>
             <span className="flex items-center gap-2"><Zap size={16} aria-hidden="true" /> AI-powered coaching</span>

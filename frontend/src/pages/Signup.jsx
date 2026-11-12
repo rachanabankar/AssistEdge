@@ -654,13 +654,13 @@ export default function Signup() {
                   />
                   <span>
                     I agree to the{' '}
-                    <span className="font-medium text-indigo-600 cursor-not-allowed" title="Coming soon">
+                    <Link to="/terms" className="font-medium text-indigo-600 hover:underline">
                       Terms of Service
-                    </span>{' '}
+                    </Link>{' '}
                     and{' '}
-                    <span className="font-medium text-indigo-600 cursor-not-allowed" title="Coming soon">
+                    <Link to="/privacy" className="font-medium text-indigo-600 hover:underline">
                       Privacy Policy
-                    </span>
+                    </Link>
                   </span>
                 </label>
 
@@ -715,6 +715,12 @@ export default function Signup() {
               )}
 
               {/* CHANGED: mt-6 text-[15px] -> mt-3 text-sm */}
+              <p className="mt-3 text-center text-sm text-slate-500">
+                By continuing you agree to the{' '}
+                <Link to="/terms" className="font-medium text-indigo-600 hover:underline">Terms</Link>
+                {' '}and{' '}
+                <Link to="/privacy" className="font-medium text-indigo-600 hover:underline">Privacy Policy</Link>.
+              </p>
               <p className="mt-3 text-center text-sm text-slate-500">
                 Already have an account?{' '}
                 <Link to="/login" className="font-semibold text-indigo-600 hover:underline">

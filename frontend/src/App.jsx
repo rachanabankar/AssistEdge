@@ -15,6 +15,8 @@ import Signup from "./pages/Signup";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 const PAGES = {
   simulator: CoachingConsole,
@@ -45,6 +47,8 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
       {/* CHANGED: removed the unwrapped duplicate /login, /signup, /forgot-password
           and /reset-password routes that sat above these and matched first,
           so PublicRoute never ran. Also removed the duplicate "/" route. */}
