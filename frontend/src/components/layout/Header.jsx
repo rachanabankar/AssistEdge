@@ -88,7 +88,7 @@ export default function Header() {
     <>
       {/* The header intentionally contains only two controls:
           notifications and the user profile. */}
-      <div className="flex h-full items-center justify-end gap-4">
+      <div className="relative z-50 flex h-full items-center justify-end gap-4">
         <NotificationsDropdown
           onViewAll={() => setNotificationsListOpen(true)}
         />

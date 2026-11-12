@@ -1,139 +1,68 @@
 <!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  @page { size: A4; margin: 2cm; }
-  body { font-family: 'Helvetica', 'Arial', sans-serif; color: #1a1a2e; font-size: 11pt; }
-  h1 { font-size: 20pt; margin-bottom: 0; }
-  .subtitle { color: #666; font-size: 10pt; margin-top: 4px; }
-  .mode-badge {
-    padding: 2px 10px; background: #6c5ce7; color: white; font-size: 9pt;
-  }
-  section { margin-top: 24px; }
-  h2 { font-size: 13pt; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-  .overview-table { width: 100%; }
-  .overview-table td { width: 50%; padding: 6px 8px 6px 0; vertical-align: top; }
-  .overview-label { font-size: 9pt; color: #666; text-transform: uppercase; }
-  .overview-value { font-size: 11pt; }
-  .score-badge { font-size: 24pt; font-weight: bold; color: #6c5ce7; }
-  table.data-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-  table.data-table th, table.data-table td {
-    text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 9.5pt;
-  }
-  table.data-table th { background-color: #f5f5fa; }
-  .tip-item { margin-bottom: 10px; padding: 8px 10px; background-color: #f9f9fc; border-left: 3px solid #6c5ce7; }
-  .tip-turn { font-size: 8.5pt; color: #888; }
-  .transcript-turn { margin-bottom: 10px; }
-  .transcript-sender { font-weight: bold; font-size: 9.5pt; }
-  .transcript-sender-customer { color: #d63384; }
-  .transcript-sender-agent { color: #0d6efd; }
-  .transcript-meta { font-size: 8.5pt; color: #888; margin-top: 2px; }
-  .escalation-flag { color: #dc3545; font-weight: bold; }
-</style>
-</head>
-<body>
-
-  <h1>Session Report</h1>
-  <div class="subtitle">
-    Session {{ session.id }} &nbsp;|&nbsp;
-    <span class="mode-badge">{{ session.mode }}</span> &nbsp;|&nbsp;
-    {{ session.created_at.strftime('%b %d, %Y %H:%M') if session.created_at else '' }} &nbsp;|&nbsp;
-    Duration: {{ (duration_seconds // 60) }}m {{ (duration_seconds % 60) }}s
-  </div>
-
-  <section>
-    <h2>Session Overview</h2>
-    <table class="overview-table">
-      {% if session.mode == 'simulator' %}
-      <tr>
-        <td>
-          <div class="overview-label">Scenario</div>
-          <div class="overview-value">{{ session.scenario or '—' }}</div>
-        </td>
-        <td>
-          <div class="overview-label">Customer Tone</div>
-          <div class="overview-value">{{ session.customer_tone or '—' }}</div>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <div class="overview-label">Patience Level</div>
-          <div class="overview-value">{{ session.patience_level or '—' }}</div>
-        </td>
-        <td></td>
-      </tr>
-      {% else %}
-      <tr>
-        <td>
-          <div class="overview-label">Scenario</div>
-          <div class="overview-value">{{ session.scenario or '—' }}</div>
-        </td>
-        <td>
-          <div class="overview-label">Product Context</div>
-          <div class="overview-value">{{ session.product_context or '—' }}</div>
-        </td>
-      </tr>
-      {% endif %}
-    </table>
-  </section>
-
-  <section>
-    <h2>Interaction Summary</h2>
-    <p>{{ report.summary }}</p>
-  </section>
-
-  <section>
-    <h2>Resolution Quality Score</h2>
-    <span class="score-badge">{{ report.resolution_score if report.resolution_score is not none else '—' }}</span>{% if report.resolution_score is not none %} / 100{% endif %}
-  </section>
-
-  <section>
-    <h2>Sentiment Journey</h2>
-    <table class="data-table">
-      <tr><th>Turn</th><th>Sentiment</th><th>Frustration Score</th></tr>
-      {% for point in sentiment_journey %}
-      <tr>
-        <td>{{ point.turn }}</td>
-        <td>{{ point.sentiment or 'N/A' }}</td>
-        <td>{{ point.frustration_score if point.frustration_score is not none else 'N/A' }}</td>
-      </tr>
-      {% endfor %}
-    </table>
-  </section>
-
-  <section>
-    <h2>Coaching Recommendations</h2>
-    {% for tip in coaching_tips %}
-    <div class="tip-item">
-      <div>{{ tip.tip if tip is mapping else tip }}</div>
-      {% if tip is mapping and tip.related_turn %}
-      <div class="tip-turn">— referencing customer turn {{ tip.related_turn }}</div>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </section>
-
-  <section>
-    <h2>Full Transcript</h2>
-    {% for turn in transcript %}
-    <div class="transcript-turn">
-      <span class="transcript-sender transcript-sender-{{ turn.sender }}">
-        {{ turn.sender|capitalize }}{% if turn.turn %} (turn {{ turn.turn }}){% endif %}:
-      </span>
-      {{ turn.content }}
-      {% if turn.sender == 'customer' %}
-      <div class="transcript-meta">
-        frustration: {{ turn.frustration_score }}
-        {% if turn.sentiment %} | intent: {{ turn.sentiment.intent }} | emotion: {{ turn.sentiment.emotional_state }}{% endif %}
-        {% if turn.escalation and turn.escalation.risk_level %}
-          <span class="escalation-flag"> | escalation risk: {{ turn.escalation.risk_level }}</span>
-        {% endif %}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </section>
-
-</body>
-</html>
+<html><head><meta charset="utf-8"><style>
+@font-face { font-family: SourceSans; src: url('fonts/SourceSans3-Regular.ttf'); }
+@font-face { font-family: SourceSans; src: url('fonts/SourceSans3-Bold.ttf'); font-weight: bold; }
+@font-face { font-family: SourceSans; src: url('fonts/SourceSans3-It.ttf'); font-style: italic; }
+@page { size: A4; margin: 18mm;
+  @frame footer { -pdf-frame-content: footer; left: 18mm; top: 281mm; width: 174mm; height: 9mm; }
+}
+body { font-family: SourceSans, Helvetica, sans-serif; font-size: 10pt; line-height: 1.5; color: #334155; }
+h1 { font-size: 22pt; color: #1E1B4B; margin: 0; padding-bottom: 6pt; border-bottom: 1px solid #4F46E5; }
+h2 { font-size: 13pt; color: #1E1B4B; margin: 13pt 0 6pt; padding-bottom: 4pt; border-bottom: 1px solid #E2E8F0; -pdf-keep-with-next: true; }
+p { margin: 0 0 6pt; }
+table { width: 100%; border-collapse: collapse; -pdf-keep-with-next: false; }
+td, th { vertical-align: top; -pdf-keep-with-next: false; }
+.label { font-size: 8pt; color: #64748B; }
+.muted { color: #64748B; }
+.metadata td { padding: 7pt 4pt 0 0; }
+.overview td { width: 50%; padding: 3pt 12pt 5pt 0; }
+.panel td { background-color: #F8FAFC; border-left: 3px solid #4F46E5; padding: 8pt 12pt; }
+.score { font-size: 26pt; font-weight: bold; color: #1E1B4B; }
+.band { font-size: 11pt; font-weight: bold; }
+.low, .good, .excellent { color: #16A34A; }
+.medium, .fair { color: #D97706; }
+.high, .poor { color: #DC2626; }
+.journey th { background-color: #E2E8F0; color: #1E1B4B; font-size: 8pt; text-align: left; padding: 5pt 8pt; }
+.journey td { padding: 5pt 8pt; border-bottom: 1px solid #E2E8F0; }
+.stripe td { background-color: #F8FAFC; }
+.tip { margin-bottom: 6pt; page-break-inside: avoid; }
+.reference { font-size: 8pt; color: #64748B; }
+.transcript td { padding: 6pt 0; border-bottom: 1px solid #E2E8F0; }
+.speaker { font-size: 8pt; font-weight: bold; }
+.customer { color: #956078; }
+.agent { color: #4F46E5; }
+.transcript-meta { font-size: 8pt; color: #64748B; }
+.footer td { font-size: 8pt; color: #64748B; padding-top: 4pt; border-top: 1px solid #E2E8F0; }
+</style></head><body>
+{% macro context(value) -%}
+{% if value and value|trim %}{{ value }}{% else %}<i class="muted">Not provided</i>{% endif %}
+{%- endmacro %}
+{% macro risk(score) -%}{% if score is number %}{% if score >= 70 %}high{% elif score >= 40 %}medium{% else %}low{% endif %}{% endif %}{%- endmacro %}
+<div id="footer"><table class="footer"><tr><td>AssistEdge Session Report</td><td style="text-align: right;">Page <pdf:pagenumber /> of <pdf:pagecount /></td></tr></table></div>
+<h1>Session Report</h1>
+<table class="metadata"><tr>
+<td style="width: 24%;"><span class="label">SESSION ID</span><br>{{ session.id[:8] }}</td>
+<td style="width: 20%;"><span class="label">MODE</span><br><span style="font-size: 8pt;">{{ session.mode|upper }}</span></td>
+<td style="width: 36%;"><span class="label">DATE</span><br>{{ session.created_at.strftime('%b %d, %Y %H:%M') if session.created_at else '' }}</td>
+<td style="width: 20%;"><span class="label">DURATION</span><br>{{ duration_seconds // 60 }}m {{ duration_seconds % 60 }}s</td>
+</tr></table>
+<h2>Session Overview</h2>
+<table class="overview"><tr><td><span class="label">SCENARIO</span><br>{{ context(session.scenario) }}</td>
+{% if session.mode == 'simulator' %}<td><span class="label">CUSTOMER TONE</span><br>{{ context(session.customer_tone) }}</td></tr><tr><td><span class="label">PATIENCE LEVEL</span><br>{{ context(session.patience_level) }}</td><td></td>
+{% else %}<td><span class="label">PRODUCT CONTEXT</span><br>{{ context(session.product_context) }}</td>{% endif %}
+</tr></table>
+<h2>Interaction Summary</h2><p>{{ report.summary }}</p>
+<h2>Resolution Quality Score</h2>
+{% set score = report.resolution_score %}
+{% set band = 'Excellent' if score is not none and score >= 85 else 'Good' if score is not none and score >= 70 else 'Fair' if score is not none and score >= 50 else 'Poor' %}
+<table class="panel"><tr><td>{% if score is not none %}<span class="score">{{ score }} / 100</span> &nbsp; <span class="band {{ band|lower }}">{{ band }}</span>{% else %}<i class="muted">Not provided</i>{% endif %}</td></tr></table>
+<table class="journey" repeat="2"><tr><td colspan="3" style="padding: 10pt 0 6pt; border: 0;"><h2>Sentiment Journey</h2></td></tr><tr><th style="width: 15%;">TURN</th><th style="width: 50%;">SENTIMENT</th><th style="width: 35%;">FRUSTRATION SCORE</th></tr>
+{% for point in sentiment_journey %}<tr{% if loop.index is even %} class="stripe"{% endif %}><td>{{ point.turn }}</td><td>{{ point.sentiment or 'N/A' }}</td><td class="{{ risk(point.frustration_score) }}">{{ point.frustration_score if point.frustration_score is not none else 'N/A' }}</td></tr>{% else %}<tr><td colspan="3" class="muted">Not provided</td></tr>{% endfor %}</table>
+<h2>Coaching Recommendations</h2>
+{% for tip in coaching_tips %}<table class="panel tip"><tr><td>{{ tip.tip if tip is mapping else tip }}{% if tip is mapping and tip.related_turn %}<br><span class="reference">Based on customer turn {{ tip.related_turn }}</span>{% endif %}</td></tr></table>{% endfor %}
+<table class="transcript" repeat="1"><tr><td style="padding: 10pt 0 6pt; border: 0;"><h2>Full Transcript</h2></td></tr>{% for turn in transcript %}<tr><td>
+<span class="speaker {% if turn.sender == 'customer' %}customer{% else %}agent{% endif %}">{{ turn.sender|capitalize }}{% if turn.turn %} (turn {{ turn.turn }}){% endif %}</span><br>
+{{ turn.content }}
+{% if turn.sender == 'customer' %}<br><span class="transcript-meta">Frustration: {{ turn.frustration_score }}{% if turn.sentiment %} | Intent: {{ turn.sentiment.intent }} | Emotion: {{ turn.sentiment.emotional_state }}{% endif %}{% if turn.escalation and turn.escalation.risk_level %} | <span class="{% if turn.escalation.risk_level|lower in ['low','medium','high'] %}{{ turn.escalation.risk_level|lower }}{% endif %}">Escalation risk: {{ turn.escalation.risk_level }}</span>{% endif %}</span>{% endif %}
+</td></tr>{% endfor %}</table>
+</body></html>

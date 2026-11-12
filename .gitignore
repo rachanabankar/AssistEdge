@@ -93,3 +93,7 @@ _tmp_set_email.py
 _patch_pdf.py
 
 .pytest_cache/
+
+production_check_results.json
+
+tmp/

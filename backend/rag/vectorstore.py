@@ -62,7 +62,10 @@ def init_vectorstore():
         raise RuntimeError("VECTOR_STORE=pgvector requires a PostgreSQL DATABASE_URL.")
     table = _get_pg_table()
     with engine.begin() as connection:
-        connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        if not connection.execute(
+            text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
+        ).scalar():
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         table.create(connection, checkfirst=True)
         for index in table.indexes:
             index.create(connection, checkfirst=True)

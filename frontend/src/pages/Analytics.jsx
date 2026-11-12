@@ -674,13 +674,13 @@ function Analytics() {
       )}
 
       {/* PAGE TITLE + DATE PICKER
-          zIndex 50 keeps the popover above everything below it. Aligning the
+          zIndex 10 keeps the popover above content and below the header menus. Aligning the
           row to the bottom keeps the button clear of the header's bell/avatar. */}
       <section
         className="analytics-heading"
         style={{
           position: "relative",
-          zIndex: 50,
+          zIndex: 10,
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "space-between",
@@ -835,7 +835,7 @@ function Analytics() {
         </div>
       </section>
 
-      {/* STAT CARDS — zIndex 1 < heading's 50, so the popover opens on top. */}
+      {/* STAT CARDS — zIndex 1 < heading's 10, so the popover opens on top. */}
       <section
         style={{
           position: "relative",
